@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import { Playfair_Display, Plus_Jakarta_Sans } from "next/font/google";
+import { Fredoka, Manrope } from "next/font/google";
 import "./globals.css";
+import { Providers } from "./providers";
 import { Nav } from "@/components/nav";
 import { Footer } from "@/components/footer";
 
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
+const fredoka = Fredoka({
+  variable: "--font-fredoka",
   subsets: ["latin"],
 });
 
-const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
@@ -31,12 +32,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${playfair.variable} ${jakarta.variable}`}>
+    <html lang="en" className={`${fredoka.variable} ${manrope.variable}`}>
       <body>
-        <div className="grain" aria-hidden />
-        <Nav />
-        <main className="min-h-[100dvh]">{children}</main>
-        <Footer />
+        <Providers>
+          <Nav />
+          <main className="min-h-[100dvh]">{children}</main>
+          <Footer />
+        </Providers>
       </body>
     </html>
   );

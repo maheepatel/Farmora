@@ -5,7 +5,7 @@
 // using the exact filenames from AI_IMAGE_PROMPTS.md (hero.jpg, parcel-1.jpg, ...).
 // Everything else picks up automatically.
 
-export const USE_AI_IMAGES = false;
+export const USE_AI_IMAGES = true;
 
 const LOCAL: Record<string, string> = {
   hero: "/images/hero.jpg",

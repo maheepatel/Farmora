@@ -1,55 +1,53 @@
 import Link from "next/link";
-import { Logo } from "./logo";
+import { Leaf } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="border-t hairline">
-      <div className="mx-auto max-w-[1400px] px-4 py-16 sm:px-6">
-        <div className="grid gap-12 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
-          <div className="max-w-xs">
-            <Logo />
-            <p className="mt-4 text-sm leading-relaxed text-ink-2">
-              Farmland, tokenised. Farmora turns verified agricultural land into
-              shareable digital assets on the Monad network.
-            </p>
-          </div>
-
+    <footer className="border-t-2 border-ink-800">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-12 sm:px-6 lg:flex-row lg:items-start lg:justify-between lg:px-8">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-ink-800 bg-emerald-600 text-emerald-50 shadow-[3px_3px_0_0_var(--color-forest)]">
+            <Leaf size={20} strokeWidth={2.5} />
+          </span>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">
-              Explore
-            </p>
-            <ul className="mt-4 space-y-2.5 text-sm text-ink-2">
-              <li><Link className="hover:text-ink" href="/parcels">Browse parcels</Link></li>
-              <li><Link className="hover:text-ink" href="/dashboard">Your portfolio</Link></li>
-              <li><Link className="hover:text-ink" href="/#how-it-works">How it works</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">
-              Network
-            </p>
-            <ul className="mt-4 space-y-2.5 text-sm text-ink-2">
-              <li><a className="hover:text-ink" href="https://www.monad.xyz/" target="_blank" rel="noreferrer">Monad</a></li>
-              <li><a className="hover:text-ink" href="https://docs.monad.xyz/" target="_blank" rel="noreferrer">Monad docs</a></li>
-              <li><a className="hover:text-ink" href="https://monadscan.com/" target="_blank" rel="noreferrer">Monadscan</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-3">
-              Project
-            </p>
-            <ul className="mt-4 space-y-2.5 text-sm text-ink-2">
-              <li><a className="hover:text-ink" href="https://blitz.devnads.com/events/monad-blitz-bangalore-v5" target="_blank" rel="noreferrer">Monad Blitz</a></li>
-              <li><a className="hover:text-ink" href="#top">Built for a hackathon</a></li>
-            </ul>
+            <p className="font-heading text-xl font-bold tracking-tight text-ink-900">Farmora</p>
+            <p className="text-xs text-zinc-500">Real land. Real yield. No tractor required.</p>
           </div>
         </div>
 
-        <div className="mt-14 flex flex-col items-start justify-between gap-3 border-t hairline pt-6 text-xs text-ink-3 sm:flex-row sm:items-center">
-          <p>Farmora. RWA farmland on Monad.</p>
-          <p>Demo build, not investment advice.</p>
+        <div className="grid gap-6 text-sm sm:grid-cols-3">
+          <div>
+            <p className="font-heading font-bold text-ink-900">Explore</p>
+            <ul className="mt-2 space-y-1.5 text-zinc-600">
+              <li><Link className="hover:text-emerald-700" href="/marketplace">Parcels</Link></li>
+              <li><Link className="hover:text-emerald-700" href="/portfolio">Cropfolio</Link></li>
+              <li><Link className="hover:text-emerald-700" href="/stays">Stays</Link></li>
+              <li><Link className="hover:text-emerald-700" href="/add-tokens">Add to Wallet</Link></li>
+              <li><Link className="hover:text-emerald-700" href="/admin">Farm Ops</Link></li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-heading font-bold text-ink-900">Network</p>
+            <ul className="mt-2 space-y-1.5 text-zinc-600">
+              <li><a className="hover:text-emerald-700" href="https://www.monad.xyz/" target="_blank" rel="noreferrer">Monad</a></li>
+              <li><a className="hover:text-emerald-700" href="https://docs.monad.xyz/" target="_blank" rel="noreferrer">Monad docs</a></li>
+              <li><a className="hover:text-emerald-700" href="https://testnet.monadscan.com" target="_blank" rel="noreferrer">Monadscan</a></li>
+              <li><a className="hover:text-emerald-700" href="https://faucet.monad.xyz" target="_blank" rel="noreferrer">Faucet</a></li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-heading font-bold text-ink-900">Project</p>
+            <ul className="mt-2 space-y-1.5 text-zinc-600">
+              <li><a className="hover:text-emerald-700" href="https://blitz.devnads.com/events/monad-blitz-bangalore-v5" target="_blank" rel="noreferrer">Monad Blitz</a></li>
+              <li><a className="hover:text-emerald-700" href="#top">Built for a hackathon</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div className="border-t-2 border-ink-100">
+        <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-2 px-4 py-5 text-xs text-zinc-500 sm:flex-row sm:items-center sm:px-6 lg:px-8">
+          <p>© 2026 Farmora. Built on Monad Testnet.</p>
+          <p>NOT FINANCIAL ADVICE · TOKENIZED LAND IS A SPECULATIVE EXPERIMENT</p>
         </div>
       </div>
     </footer>

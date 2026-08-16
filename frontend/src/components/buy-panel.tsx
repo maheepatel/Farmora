@@ -1,168 +1,244 @@
 "use client";
 
-import { CheckCircle, Lightning, Wallet } from "@phosphor-icons/react/dist/ssr";
-import Link from "next/link";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { waitForTransactionReceipt } from "@wagmi/core/actions";
+import { AnimatePresence, animate, motion } from "framer-motion";
 import { useMemo, useState } from "react";
-import type { Parcel } from "@/lib/parcels";
-import { useWallet } from "@/lib/store";
-import { formatINR } from "@/lib/format";
+import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { landBatchAbi, usdcAbi, useUSDCBalance } from "@/lib/contracts";
+import { BATCH_ADDRESSES, CONTRACT_ADDRESSES, getBatchMeta } from "@/lib/config";
+import { fmtUSDC, fmtTokens } from "@/lib/format";
+import { toBigIntTokens, tokenCost } from "@/lib/estimator";
+import { wagmiConfig } from "@/lib/wagmi";
 
-const presets = [10, 50, 100, 500];
+type Step = "input" | "approving" | "buying" | "success" | "error";
 
-export function BuyPanel({ parcel }: { parcel: Parcel }) {
-  const { state, connect, buyShares } = useWallet();
-  const [shares, setShares] = useState<number | "">(100);
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+export function BuyPanel({
+  batchId,
+  pricePerToken,
+  soldTokens,
+  totalSupply,
+}: {
+  batchId: number;
+  pricePerToken: bigint;
+  soldTokens: bigint;
+  totalSupply: bigint;
+}) {
+  const { address, isConnected } = useAccount();
+  const meta = getBatchMeta(batchId);
+  const [acres, setAcres] = useState("");
+  const [isFixed, setIsFixed] = useState(true);
+  const [step, setStep] = useState<Step>("input");
   const [error, setError] = useState("");
+  const [countUp, setCountUp] = useState(0);
 
-  const remaining = parcel.totalShares - parcel.soldShares;
+  const { balance: usdcBalance } = useUSDCBalance(address);
+
+  const { data: allowance } = useReadContract({
+    address: CONTRACT_ADDRESSES.mockUSDC,
+    abi: usdcAbi,
+    functionName: "allowance",
+    args: address ? [address, BATCH_ADDRESSES[batchId]] : undefined,
+    query: { enabled: !!address, refetchInterval: 10_000 },
+  });
+
+  const tokens = useMemo(() => {
+    const n = Number(acres || "0");
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return Math.floor(n * meta.tokensPerAcre);
+  }, [acres, meta]);
+
   const cost = useMemo(
-    () => (typeof shares === "number" ? Math.round(shares * parcel.sharePrice) : 0),
-    [shares, parcel.sharePrice],
+    () => tokenCost(tokens, pricePerToken || 1000000000000000000n),
+    [tokens, pricePerToken],
   );
+  const price = pricePerToken || 1000000000000000000n;
+  const needsApproval = ((allowance as bigint) ?? 0n) < cost;
 
-  function handleBuy() {
-    setStatus("idle");
+  const approve = useWriteContract();
+  const buy = useWriteContract();
+
+  const handleBuy = async () => {
+    if (tokens <= 0) return;
     setError("");
-    if (!state.address) {
-      connect();
-      return;
+    setStep("approving");
+    try {
+      const batchAddr = BATCH_ADDRESSES[batchId];
+      const tokenAmount = toBigIntTokens(tokens);
+      if (needsApproval) {
+        const approveHash = await approve.writeContractAsync({
+          address: CONTRACT_ADDRESSES.mockUSDC,
+          abi: usdcAbi,
+          functionName: "approve",
+          args: [batchAddr, cost],
+        });
+        await waitForTransactionReceipt(wagmiConfig, { hash: approveHash });
+      }
+      setStep("buying");
+      const buyHash = await buy.writeContractAsync({
+        address: batchAddr,
+        abi: landBatchAbi,
+        functionName: "buyTokens",
+        args: [tokenAmount, isFixed],
+      });
+      await waitForTransactionReceipt(wagmiConfig, { hash: buyHash });
+      setStep("success");
+      const controls = animate(0, tokens, {
+        duration: 1.4,
+        ease: "easeOut",
+        onUpdate: (v) => setCountUp(Math.round(v)),
+      });
+      return () => controls.stop();
+    } catch {
+      setStep("error");
+      setError("The transaction was rejected or failed.");
     }
-    const qty = typeof shares === "number" ? shares : 0;
-    if (qty <= 0) {
-      setError("Enter a number of shares first.");
-      setStatus("error");
-      return;
-    }
-    if (qty > remaining) {
-      setError(`Only ${remaining.toLocaleString("en-IN")} shares remain.`);
-      setStatus("error");
-      return;
-    }
-    if (cost > state.balance) {
-      setError(
-        `You need ${formatINR(cost)} but your balance is ${formatINR(state.balance)}.`,
-      );
-      setStatus("error");
-      return;
-    }
-    buyShares(parcel.id, qty, parcel.sharePrice);
-    setStatus("success");
-  }
+  };
+
+  const running = step === "approving" || step === "buying";
 
   return (
-    <div className="rounded-[1.5rem] bg-paper-2 p-6 ring-1 ring-ink/10 md:p-8">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.16em] text-ink-3">
-            Share price
-          </p>
-          <p className="mt-1 font-display text-4xl text-ink">
-            {formatINR(parcel.sharePrice)}
-          </p>
-        </div>
-        <div className="text-right text-sm text-ink-2">
-          <p>
-            <span className="font-semibold text-ink">
-              {parcel.annualYieldPct.toFixed(1)}%
-            </span>{" "}
-            annual yield
-          </p>
-          <p className="mt-0.5 text-xs text-ink-3">
-            {remaining.toLocaleString("en-IN")} shares left
-          </p>
-        </div>
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="sticker-card sticky top-20 z-10 flex flex-col gap-4 bg-white p-5"
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="font-heading text-2xl font-bold text-ink-900">Buy {meta.tokenSymbol}</h3>
+        <span className="sticker-badge bg-emerald-50 text-emerald-700">
+          {fmtUSDC(price)} mUSDC/token
+        </span>
       </div>
 
-      <div className="mt-6">
-        <label
-          htmlFor="shares"
-          className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-2"
-        >
-          Shares to buy
-        </label>
+      <div>
+        <label htmlFor="acres" className="text-sm font-semibold text-zinc-600">Acres to buy</label>
         <input
-          id="shares"
+          id="acres"
           type="number"
-          min={1}
-          max={remaining}
-          value={shares}
-          onChange={(e) => {
-            const v = e.target.value;
-            setShares(v === "" ? "" : Math.max(0, Number(v)));
-            setStatus("idle");
-            setError("");
-          }}
-          className="mt-2 w-full rounded-2xl border border-ink/15 bg-paper px-4 py-3 text-lg text-ink focus:border-sage focus:outline-none focus:ring-2 focus:ring-sage/20"
+          min="1"
+          inputMode="decimal"
+          placeholder="1"
+          value={acres}
+          onChange={(e) => setAcres(e.target.value)}
+          className="input-ledger mt-1 font-heading text-xl"
         />
-        <div className="mt-3 flex flex-wrap gap-2">
-          {presets.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => {
-                setShares(p);
-                setStatus("idle");
-                setError("");
-              }}
-              className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
-                shares === p
-                  ? "border-sage-2 bg-sage-2 text-paper"
-                  : "border-ink/15 text-ink-2 hover:border-ink/30"
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+        <p className="mt-1 text-xs text-zinc-500">
+          {meta.tokensPerAcre} tokens per acre · {fmtTokens(BigInt(tokens))} tokens
+        </p>
       </div>
 
-      <div className="mt-6 flex items-center justify-between border-t hairline pt-5">
-        <span className="text-sm text-ink-2">Total cost</span>
-        <span className="font-display text-2xl text-ink">{formatINR(cost)}</span>
-      </div>
-
-      {status === "success" ? (
-        <div className="mt-6 rounded-2xl bg-sage-50 p-4 text-sm text-sage-2 ring-1 ring-sage/30">
-          <p className="flex items-center gap-2 font-medium">
-            <CheckCircle size={18} weight="fill" />
-            Purchase placed in your portfolio
-          </p>
-          <p className="mt-1 text-xs text-ink-2">
-            This is a demo transaction. On Monad testnet it would settle in a
-            block.
-          </p>
-          <Link
-            href="/dashboard"
-            className="mt-3 inline-flex rounded-full bg-sage-2 px-4 py-2 text-xs font-medium text-paper hover:bg-sage-3"
-          >
-            View dashboard
-          </Link>
-        </div>
-      ) : (
-        <>
-          {status === "error" && (
-            <p className="mt-5 rounded-2xl bg-harvest/10 p-3 text-sm text-harvest-2 ring-1 ring-harvest/30">
-              {error}
-            </p>
-          )}
+      <div className="rounded-xl bg-ink-50 p-3">
+        <p className="text-xs font-semibold text-zinc-600">return type</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={handleBuy}
-            disabled={typeof shares === "number" && shares <= 0}
-            className="btn-spring mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-sage-2 px-6 py-3.5 text-sm font-medium text-paper hover:bg-sage-3 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => setIsFixed(true)}
+            className={`rounded-full px-2 py-1.5 text-sm font-semibold border-2 transition-all ${
+              isFixed
+                ? "border-ink-800 bg-emerald-600 text-white shadow-[2px_2px_0_0_var(--color-forest)]"
+                : "border-transparent text-ink-600 hover:bg-white"
+            }`}
           >
-            <Wallet size={16} weight="regular" />
-            {state.address ? `Buy for ${formatINR(cost)}` : "Connect wallet to buy"}
+            Fixed return
           </button>
-        </>
-      )}
-
-      <div className="mt-5 flex items-center gap-2 text-xs text-ink-3">
-        <Lightning size={13} />
-        Demo build: wallet, purchases and yield are simulated in your browser
-        until Monad contracts go live.
+          <button
+            type="button"
+            onClick={() => setIsFixed(false)}
+            className={`rounded-full px-2 py-1.5 text-sm font-semibold border-2 transition-all ${
+              !isFixed
+                ? "border-ink-800 bg-emerald-600 text-white shadow-[2px_2px_0_0_var(--color-forest)]"
+                : "border-transparent text-ink-600 hover:bg-white"
+            }`}
+          >
+            Variable return
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">
+          {isFixed
+            ? "Fixed caps your return at the batch's fixed rate."
+            : "Variable tracks the harvest, stepped down as the investor share declines."}
+        </p>
       </div>
-    </div>
+
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-zinc-600">cost</span>
+        <span className="font-heading text-2xl font-bold tabular text-emerald-700">
+          {fmtUSDC(cost)} mUSDC
+        </span>
+      </div>
+      <p className="text-xs text-zinc-500">
+        10% of revenue goes to a buyback reserve. 1 token = 1 mUSDC.
+      </p>
+
+      <AnimatePresence mode="wait">
+        {step === "success" ? (
+          <motion.div
+            key="success"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="rounded-xl bg-emerald-50 p-4 text-center ring-2 ring-emerald-600"
+          >
+            <p className="text-3xl">🎉</p>
+            <p className="font-heading text-2xl font-bold text-emerald-700">Purchase successful!</p>
+            <p className="mt-1 font-heading text-xl text-ink-900">
+              <AnimatedCount value={countUp} /> {meta.tokenSymbol} minted
+            </p>
+            <a href="/portfolio" className="sticker-btn-outline mt-3 !text-sm">
+              See it in my Cropfolio
+            </a>
+          </motion.div>
+        ) : !isConnected ? (
+          <ConnectButton.Custom key="connect">
+            {({ openConnectModal }) => (
+              <button
+                type="button"
+                onClick={openConnectModal}
+                className="sticker-btn w-full"
+              >
+                Connect wallet to buy
+              </button>
+            )}
+          </ConnectButton.Custom>
+        ) : (
+          <motion.div key="actions" className="flex flex-col gap-2">
+            {step === "error" && (
+              <p className="font-display text-sm text-rose-600">{error}</p>
+            )}
+            <button
+              type="button"
+              onClick={handleBuy}
+              disabled={tokens <= 0 || running}
+              className="sticker-btn w-full"
+            >
+              {running ? (
+                step === "approving" ? "Approving…" : "Buying…"
+              ) : needsApproval ? (
+                "Approve & Buy"
+              ) : (
+                "Buy Tokens"
+              )}
+            </button>
+            {running && (
+              <p className="text-center text-xs text-zinc-500">
+                Confirm in your wallet, then it lands on-chain.
+              </p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex justify-between text-xs text-zinc-500">
+        <span>USDC balance: {fmtUSDC(usdcBalance)}</span>
+        <span>{fmtTokens(soldTokens)}/{fmtTokens(totalSupply)} sold</span>
+      </div>
+    </motion.div>
+  );
+}
+
+function AnimatedCount({ value }: { value: number }) {
+  return (
+    <motion.span key={value} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }}>
+      {value.toLocaleString("en-US")}
+    </motion.span>
   );
 }

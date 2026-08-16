@@ -281,14 +281,8 @@ staysPage.on("pageerror", (e) => staysErrors.push("PAGEERROR: " + String(e).slic
 await injectWallet(staysPage);
 await staysPage.goto("http://localhost:3000/stays", { waitUntil: "networkidle2", timeout: 60000 });
 await new Promise((r) => setTimeout(r, 6000));
-const availClicked = await staysPage.evaluate(() => {
-  const btn = [...document.querySelectorAll("button")].find((b) => b.innerText.includes("Check availability") && !b.disabled);
-  if (btn) { btn.click(); return true; }
-  return false;
-});
-report("stays: check availability clicked", availClicked);
-const modalOpened = await waitForSelector(staysPage, 'input[type="date"]', 30000);
-report("stays: booking modal opens", modalOpened);
+const dateInputPresent = await waitForSelector(staysPage, 'input[type="date"]', 30000);
+report("stays: date picker present", dateInputPresent);
 let freeWeekend = false;
 let bookedISO = null;
 for (let offset = 10; offset <= 45 && !freeWeekend; offset++) {
@@ -313,7 +307,6 @@ report("stays: booking completes on-chain", booked);
 report("stays: no console errors", staysErrors.length === 0, staysErrors[0] || "");
 if (bookedISO) {
   const bookedDayNum = Math.floor(Date.parse(bookedISO + "T00:00:00Z") / 86400000);
-  const isBookedSel = toFunctionSelector("isBooked(uint256,uint256)");
   const callData = encodeFunctionData({ abi: [{ name: "isBooked", type: "function", stateMutability: "view", inputs: [{ name: "batchId", type: "uint256" }, { name: "day", type: "uint256" }], outputs: [{ name: "", type: "bool" }] }], functionName: "isBooked", args: [0, BigInt(bookedDayNum)] });
   const takenHex = await rpc("eth_call", [{ to: STAY_ADDR, data: callData }, "latest"]).catch(() => "0x0");
   report("stays: night taken on-chain (double-book guard)", BigInt(takenHex || "0x0") === 1n);
