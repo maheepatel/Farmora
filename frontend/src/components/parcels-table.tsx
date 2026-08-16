@@ -10,8 +10,8 @@ export function ParcelsTable({ limit }: { limit?: number }) {
   const ids = limit ? Array.from({ length: limit }, (_, i) => i) : Array.from({ length: 8 }, (_, i) => i);
 
   return (
-    <div className="sticker-card overflow-hidden bg-white">
-      <div className="hidden grid-cols-[2.4fr_1fr_1fr_1fr_1fr_3rem] gap-4 border-b-2 border-ink-800 bg-ink-100 px-6 py-3 text-xs font-bold uppercase tracking-wide text-ink-800 md:grid">
+    <div className="sketch overflow-hidden bg-white">
+      <div className="hidden grid-cols-[2.4fr_1fr_1fr_1fr_1fr_3rem] gap-4 border-b-2 border-ink/20 bg-paper-2 px-6 py-3 text-xs font-bold uppercase tracking-wide text-ink-2 md:grid">
         <span>Parcel</span>
         <span className="text-right">Acres</span>
         <span className="text-right">Price / token</span>
@@ -19,7 +19,7 @@ export function ParcelsTable({ limit }: { limit?: number }) {
         <span className="text-right">Tokens left</span>
         <span />
       </div>
-      <div className="divide-y-2 divide-ink-100">
+      <div className="divide-y-2 divide-ink/10">
         {ids.map((id) => (
           <ParcelRow key={id} id={id} />
         ))}
@@ -48,18 +48,18 @@ function ParcelRow({ id }: { id: number }) {
   return (
     <Link
       href={`/batch/${id}`}
-      className="grid grid-cols-[1fr_auto] items-center gap-4 px-6 py-5 transition-colors hover:bg-emerald-50/60 md:grid-cols-[2.4fr_1fr_1fr_1fr_1fr_3rem]"
+      className="group grid grid-cols-[1fr_auto] items-center gap-4 px-6 py-5 transition-colors hover:bg-paper-2/70 md:grid-cols-[2.4fr_1fr_1fr_1fr_1fr_3rem]"
     >
-      <span className="min-w-0 truncate font-heading font-semibold text-ink-900">
+      <span className="min-w-0 truncate font-display text-lg text-ink">
         {cells[0][0]}
       </span>
-      <span className="hidden text-right tabular text-sm text-ink-700 md:block">{cells[1][0]}</span>
-      <span className="hidden text-right tabular text-sm text-ink-700 md:block">{cells[2][0]}</span>
-      <span className="hidden text-right tabular text-sm text-ink-700 md:block">{cells[3][0]}</span>
-      <span className="hidden text-right tabular text-sm font-semibold text-emerald-700 md:block">
+      <span className="hidden text-right text-sm text-ink-2 md:block">{cells[1][0]}</span>
+      <span className="hidden text-right text-sm text-ink-2 md:block">{cells[2][0]}</span>
+      <span className="hidden text-right text-sm text-ink-2 md:block">{cells[3][0]}</span>
+      <span className="hidden text-right text-sm font-bold text-sage-2 md:block">
         {cells[4][0]}
       </span>
-      <span className="justify-self-end text-ink-300 transition-colors group-hover:text-emerald-600">
+      <span className="justify-self-end text-ink-3 transition-colors group-hover:text-sage-2">
         <ArrowRight size={18} />
       </span>
     </Link>

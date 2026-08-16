@@ -101,17 +101,17 @@ export function BuyPanel({
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
-      className="sticker-card sticky top-20 z-10 flex flex-col gap-4 bg-white p-5"
+      className="sketch sticky top-20 z-10 flex flex-col gap-4 bg-white p-5"
     >
       <div className="flex items-center justify-between">
-        <h3 className="font-heading text-2xl font-bold text-ink-900">Buy {meta.tokenSymbol}</h3>
-        <span className="sticker-badge bg-emerald-50 text-emerald-700">
+        <h3 className="font-display text-2xl text-ink">Buy {meta.tokenSymbol}</h3>
+        <span className="chip bg-sage-50">
           {fmtUSDC(price)} mUSDC/token
         </span>
       </div>
 
       <div>
-        <label htmlFor="acres" className="text-sm font-semibold text-zinc-600">Acres to buy</label>
+        <label htmlFor="acres" className="text-sm font-semibold text-ink-2">Acres to buy</label>
         <input
           id="acres"
           type="number"
@@ -120,23 +120,23 @@ export function BuyPanel({
           placeholder="1"
           value={acres}
           onChange={(e) => setAcres(e.target.value)}
-          className="input-ledger mt-1 font-heading text-xl"
+          className="input-sketch mt-1 text-xl"
         />
-        <p className="mt-1 text-xs text-zinc-500">
+        <p className="mt-1 text-xs text-ink-3">
           {meta.tokensPerAcre} tokens per acre · {fmtTokens(BigInt(tokens))} tokens
         </p>
       </div>
 
-      <div className="rounded-xl bg-ink-50 p-3">
-        <p className="text-xs font-semibold text-zinc-600">return type</p>
+      <div className="sketch-soft bg-paper-2 p-3">
+        <p className="text-xs font-semibold text-ink-3">return type</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => setIsFixed(true)}
-            className={`rounded-full px-2 py-1.5 text-sm font-semibold border-2 transition-all ${
+            className={`rounded-full border-2 px-2 py-1.5 text-sm font-semibold transition-all ${
               isFixed
-                ? "border-ink-800 bg-emerald-600 text-white shadow-[2px_2px_0_0_var(--color-forest)]"
-                : "border-transparent text-ink-600 hover:bg-white"
+                ? "border-ink bg-ink text-paper shadow-[2px_2px_0_rgba(43,38,29,0.2)]"
+                : "border-transparent text-ink-2 hover:bg-white"
             }`}
           >
             Fixed return
@@ -144,16 +144,16 @@ export function BuyPanel({
           <button
             type="button"
             onClick={() => setIsFixed(false)}
-            className={`rounded-full px-2 py-1.5 text-sm font-semibold border-2 transition-all ${
+            className={`rounded-full border-2 px-2 py-1.5 text-sm font-semibold transition-all ${
               !isFixed
-                ? "border-ink-800 bg-emerald-600 text-white shadow-[2px_2px_0_0_var(--color-forest)]"
-                : "border-transparent text-ink-600 hover:bg-white"
+                ? "border-ink bg-ink text-paper shadow-[2px_2px_0_rgba(43,38,29,0.2)]"
+                : "border-transparent text-ink-2 hover:bg-white"
             }`}
           >
             Variable return
           </button>
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-xs text-ink-3">
           {isFixed
             ? "Fixed caps your return at the batch's fixed rate."
             : "Variable tracks the harvest, stepped down as the investor share declines."}
@@ -161,13 +161,13 @@ export function BuyPanel({
       </div>
 
       <div className="flex items-center justify-between text-sm">
-        <span className="text-zinc-600">cost</span>
-        <span className="font-heading text-2xl font-bold tabular text-emerald-700">
+        <span className="text-ink-2">cost</span>
+        <span className="font-display text-3xl text-sage-2">
           {fmtUSDC(cost)} mUSDC
         </span>
       </div>
-      <p className="text-xs text-zinc-500">
-        10% of revenue goes to a buyback reserve. 1 token = 1 mUSDC.
+      <p className="text-xs text-ink-3">
+        Every purchase funds the buyback reserve. 1 token = 1 mUSDC.
       </p>
 
       <AnimatePresence mode="wait">
@@ -176,14 +176,14 @@ export function BuyPanel({
             key="success"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="rounded-xl bg-emerald-50 p-4 text-center ring-2 ring-emerald-600"
+            className="sketch-soft bg-sage-50 p-4 text-center"
           >
             <p className="text-3xl">🎉</p>
-            <p className="font-heading text-2xl font-bold text-emerald-700">Purchase successful!</p>
-            <p className="mt-1 font-heading text-xl text-ink-900">
+            <p className="font-display text-2xl text-sage-2">Purchase successful!</p>
+            <p className="mt-1 font-display text-xl text-ink">
               <AnimatedCount value={countUp} /> {meta.tokenSymbol} minted
             </p>
-            <a href="/portfolio" className="sticker-btn-outline mt-3 !text-sm">
+            <a href="/portfolio" className="btn btn-sketch mt-3 !text-sm">
               See it in my Cropfolio
             </a>
           </motion.div>
@@ -193,7 +193,7 @@ export function BuyPanel({
               <button
                 type="button"
                 onClick={openConnectModal}
-                className="sticker-btn w-full"
+                className="btn btn-fill w-full"
               >
                 Connect wallet to buy
               </button>
@@ -202,13 +202,13 @@ export function BuyPanel({
         ) : (
           <motion.div key="actions" className="flex flex-col gap-2">
             {step === "error" && (
-              <p className="font-display text-sm text-rose-600">{error}</p>
+              <p className="font-display text-sm text-tomato">{error}</p>
             )}
             <button
               type="button"
               onClick={handleBuy}
               disabled={tokens <= 0 || running}
-              className="sticker-btn w-full"
+              className="btn btn-fill w-full"
             >
               {running ? (
                 step === "approving" ? "Approving…" : "Buying…"
@@ -219,7 +219,7 @@ export function BuyPanel({
               )}
             </button>
             {running && (
-              <p className="text-center text-xs text-zinc-500">
+              <p className="text-center text-xs text-ink-3">
                 Confirm in your wallet, then it lands on-chain.
               </p>
             )}
@@ -227,7 +227,7 @@ export function BuyPanel({
         )}
       </AnimatePresence>
 
-      <div className="flex justify-between text-xs text-zinc-500">
+      <div className="flex justify-between text-xs text-ink-3">
         <span>USDC balance: {fmtUSDC(usdcBalance)}</span>
         <span>{fmtTokens(soldTokens)}/{fmtTokens(totalSupply)} sold</span>
       </div>

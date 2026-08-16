@@ -209,17 +209,17 @@ farmora/
 │   │   │   ├── marketplace/       parcel list
 │   │   │   ├── batch/[id]/        parcel detail and buy
 │   │   │   ├── portfolio/         holdings, claim, sell
-│   │   │   ├── admin/             farm ops
+│   │   │   ├── admin/             farm ops (admin wallet only)
 │   │   │   ├── stays/             farmhouse bookings
 │   │   │   └── add-tokens/        wallet token registry
 │   │   ├── components/        UI
 │   │   └── lib/
 │   │       ├── abi/           contract ABIs, 4 JSON files
-│   │       ├── config.ts      chain config, economics, the 8 parcels
+│   │       ├── config.ts      chain config, admin wallet, economics, the 8 parcels
+│   │       ├── contracts.ts   typed reads and write helpers over the ABIs
 │   │       ├── deployed.json  auto-copied from contracts/deployed.json, don't edit this one
+│   │       ├── estimator.ts   return estimates
 │   │       ├── wagmi.ts       wallet connection
-│   │       ├── live.ts        the 30s live-read layer
-│   │       ├── tx.ts          transaction helpers
 │   │       └── format.ts      number and date formatting
 │   └── package.json
 ├── PRD.md                     full product spec

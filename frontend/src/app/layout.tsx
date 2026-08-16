@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
-import { Fredoka, Manrope } from "next/font/google";
+import { Nunito, Patrick_Hand } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Nav } from "@/components/nav";
 import { Footer } from "@/components/footer";
 
-const fredoka = Fredoka({
-  variable: "--font-fredoka",
+const patrick = Patrick_Hand({
+  variable: "--font-hand",
   subsets: ["latin"],
+  weight: "400",
 });
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const nunito = Nunito({
+  variable: "--font-body",
   subsets: ["latin"],
 });
 
@@ -32,8 +33,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${fredoka.variable} ${manrope.variable}`}>
+    <html lang="en" className={`${patrick.variable} ${nunito.variable}`}>
       <body>
+        <div className="paper-grain" aria-hidden="true" />
         <Providers>
           <Nav />
           <main className="min-h-[100dvh]">{children}</main>

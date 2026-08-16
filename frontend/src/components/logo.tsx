@@ -9,7 +9,7 @@ export function Logo({ dark = false }: { dark?: boolean }) {
     >
       <span
         className={`sketch-xs flex h-10 w-10 items-center justify-center border-2 transition-transform group-hover:-rotate-6 ${
-          dark ? "bg-sage2" : "bg-sage"
+          dark ? "bg-sage-2" : "bg-sage"
         }`}
       >
         <svg

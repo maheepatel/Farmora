@@ -21,25 +21,25 @@ export default function PortfolioPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-14 sm:px-6 lg:px-8">
       <div className="max-w-2xl">
-        <h1 className="font-heading text-4xl font-bold tracking-tight text-ink-900 sm:text-5xl">
-          Crop<span className="text-emerald-700">folio</span>
+        <h1 className="font-display text-5xl leading-[1.05] tracking-tight text-ink sm:text-6xl">
+          Crop<span className="paint">folio</span>
         </h1>
-        <p className="mt-4 text-lg leading-relaxed text-zinc-600">
+        <p className="mt-4 text-lg leading-relaxed text-ink-2">
           Every token you hold across the farm, live from the contracts.
         </p>
       </div>
 
       {!isConnected ? (
         <div className="mt-10">
-          <div className="sticker-card mx-auto max-w-md bg-white p-8 text-center">
+          <div className="sketch mx-auto max-w-md bg-white p-8 text-center">
             <p className="text-4xl">🧑‍🌾</p>
-            <h2 className="mt-3 font-heading text-2xl font-bold text-ink-900">Connect your wallet</h2>
-            <p className="mt-2 text-sm text-zinc-600">
+            <h2 className="mt-3 font-display text-2xl text-ink">Connect your wallet</h2>
+            <p className="mt-2 text-sm text-ink-2">
               Your holdings, pending revenue and sell requests live on-chain.
             </p>
             <ConnectButton.Custom>
               {({ openConnectModal }) => (
-                <button type="button" onClick={openConnectModal} className="sticker-btn mt-5">
+                <button type="button" onClick={openConnectModal} className="btn btn-fill mt-5">
                   Connect wallet
                 </button>
               )}
@@ -65,13 +65,14 @@ function useAllInvestorInfo(address: `0x${string}`) {
     () =>
       BATCHES.map((_, i) => {
         const t = data?.[i]?.result as unknown as
-          | [boolean, bigint, bigint, bigint]
+          | [boolean, bigint, bigint, bigint, bigint]
           | undefined;
         return {
           isFixedReturn: t?.[0] ?? false,
           totalInvested: t?.[1] ?? 0n,
-          claimedRevenue: t?.[2] ?? 0n,
-          pendingRevenue: t?.[3] ?? 0n,
+          tokenAmount: t?.[2] ?? 0n,
+          claimedRevenue: t?.[3] ?? 0n,
+          pendingRevenue: t?.[4] ?? 0n,
         };
       }),
     [data],
@@ -93,21 +94,21 @@ function HoldingGrid({ address }: { address: `0x${string}` }) {
   return (
     <div>
       <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="sticker-card bg-white p-4 text-center">
-          <p className="text-xs text-zinc-500">invested</p>
-          <p className="font-heading text-2xl font-bold tabular text-emerald-700">{fmtUSDC(totalInvested)} mUSDC</p>
+        <div className="sketch bg-white p-4 text-center">
+          <p className="text-xs text-ink-3">invested</p>
+          <p className="font-display text-2xl text-sage-2">{fmtUSDC(totalInvested)} mUSDC</p>
         </div>
-        <div className="sticker-card bg-amber-50 p-4 text-center">
-          <p className="text-xs text-zinc-500">Pending Revenue</p>
-          <p className="font-heading text-2xl font-bold tabular text-amber-700">{fmtUSDC(totalPending)} mUSDC</p>
+        <div className="sketch bg-harvest/20 p-4 text-center">
+          <p className="text-xs text-ink-3">Pending Revenue</p>
+          <p className="font-display text-2xl text-harvest-2">{fmtUSDC(totalPending)} mUSDC</p>
         </div>
-        <div className="sticker-card bg-white p-4 text-center">
-          <p className="text-xs text-zinc-500">batches</p>
-          <p className="font-heading text-2xl font-bold tabular text-ink-900">{BATCHES.length}</p>
+        <div className="sketch bg-white p-4 text-center">
+          <p className="text-xs text-ink-3">batches</p>
+          <p className="font-display text-2xl text-ink">{BATCHES.length}</p>
         </div>
-        <div className="sticker-card bg-white p-4 text-center">
-          <p className="text-xs text-zinc-500">wallet</p>
-          <p className="font-heading text-lg font-bold tabular text-ink-900">{address.slice(0, 6)}…{address.slice(-4)}</p>
+        <div className="sketch bg-white p-4 text-center">
+          <p className="text-xs text-ink-3">wallet</p>
+          <p className="font-display text-lg text-ink">{address.slice(0, 6)}…{address.slice(-4)}</p>
         </div>
       </div>
 
@@ -137,6 +138,7 @@ function HoldingCard({
   investorInfo: {
     isFixedReturn: boolean;
     totalInvested: bigint;
+    tokenAmount: bigint;
     claimedRevenue: bigint;
     pendingRevenue: bigint;
   };
@@ -173,42 +175,42 @@ function HoldingCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ delay: (index % 3) * 0.08 }}
-      className="sticker-card flex flex-col gap-3 bg-white p-5"
+      className="sketch flex flex-col gap-3 bg-white p-5"
     >
       <div className="flex items-center justify-between gap-2">
         <Link href={`/batch/${meta.id}`} className="group flex items-center gap-2">
           <span className="text-3xl">{meta.emoji}</span>
           <span>
-            <span className="block font-heading text-xl font-bold leading-none text-ink-900 group-hover:underline decoration-2 underline-offset-2">
+            <span className="block font-display text-xl leading-none text-ink group-hover:underline decoration-2 underline-offset-2">
               {meta.cropType}
             </span>
-            <span className="block text-xs text-zinc-500">{meta.tokenSymbol}</span>
+            <span className="block text-xs text-ink-3">{meta.tokenSymbol}</span>
           </span>
         </Link>
-        <span className={`sticker-badge ${isFixed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+        <span className={`chip ${isFixed ? "bg-sage-50" : "bg-harvest/25"}`}>
           {isFixed ? "fixed" : "variable"}
         </span>
       </div>
 
       <div className="grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-xl bg-ink-50 p-2">
-          <p className="text-[11px] text-zinc-500">tokens</p>
-          <p className="font-heading text-lg font-bold tabular text-ink-900">{fmtTokens(balance ?? 0n)}</p>
+        <div className="sketch-xs bg-paper-2 p-2">
+          <p className="text-[11px] text-ink-3">tokens</p>
+          <p className="font-display text-lg text-ink">{fmtTokens(balance ?? 0n)}</p>
         </div>
-        <div className="rounded-xl bg-ink-50 p-2">
-          <p className="text-[11px] text-zinc-500">invested</p>
-          <p className="font-heading text-lg font-bold tabular text-ink-900">{fmtUSDC(totalInvested)}</p>
+        <div className="sketch-xs bg-paper-2 p-2">
+          <p className="text-[11px] text-ink-3">invested</p>
+          <p className="font-display text-lg text-ink">{fmtUSDC(totalInvested)}</p>
         </div>
-        <div className="rounded-xl bg-ink-50 p-2">
-          <p className="text-[11px] text-zinc-500">claimed</p>
-          <p className="font-heading text-lg font-bold tabular text-ink-900">{fmtUSDC(claimedRevenue)}</p>
+        <div className="sketch-xs bg-paper-2 p-2">
+          <p className="text-[11px] text-ink-3">claimed</p>
+          <p className="font-display text-lg text-ink">{fmtUSDC(claimedRevenue)}</p>
         </div>
       </div>
 
-      <div className="rounded-xl bg-amber-50 p-3">
+      <div className="sketch-soft bg-harvest/15 p-3">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-zinc-600">Pending Revenue</p>
-          <p className="font-heading text-2xl font-bold tabular text-amber-700">{fmtUSDC(pendingRevenue)} mUSDC</p>
+          <p className="text-sm font-semibold text-ink-2">Pending Revenue</p>
+          <p className="font-display text-2xl text-harvest-2">{fmtUSDC(pendingRevenue)} mUSDC</p>
         </div>
         <AnimatePresence>
           {claimable && (
@@ -216,7 +218,7 @@ function HoldingCard({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="mt-2 text-center font-heading font-bold text-emerald-700"
+              className="mt-2 text-center font-display text-sage-2"
             >
               Revenue claimed! 🎉
             </motion.p>
@@ -224,7 +226,7 @@ function HoldingCard({
         </AnimatePresence>
         <button
           type="button"
-          className="sticker-btn mt-3 w-full !text-sm"
+          className="btn btn-sun mt-3 w-full !text-sm"
           disabled={pendingRevenue <= 0n || claim.isPending}
           onClick={() => {
             setClaimedMsg(false);
@@ -243,10 +245,10 @@ function HoldingCard({
         </button>
       </div>
 
-      <div className="rounded-xl bg-white p-3 ring-2 ring-ink-100">
+      <div className="sketch-xs bg-white p-3">
         {sell.active ? (
           <div>
-            <p className="font-heading text-lg font-bold text-ink-900">
+            <p className="font-display text-lg text-ink">
               Sell requested · {fmtTokens(sell.tokenAmount)} tokens
             </p>
             <SellCooldown
@@ -263,11 +265,11 @@ function HoldingCard({
             />
           </div>
         ) : sellDone ? (
-          <p className="text-center font-heading font-bold text-emerald-700">Sell requested — cooldown started ✓</p>
+          <p className="text-center font-display text-sage-2">Sell requested, cooldown started ✓</p>
         ) : !sellMode ? (
           <button
             type="button"
-            className="sticker-btn-outline w-full !text-sm"
+            className="btn btn-sketch w-full !text-sm"
             onClick={() => setSellMode(true)}
           >
             Request Sell
@@ -280,11 +282,11 @@ function HoldingCard({
               placeholder="Tokens to sell"
               value={sellAmount}
               onChange={(e) => setSellAmount(e.target.value)}
-              className="input-ledger font-heading"
+              className="input-sketch"
             />
             <button
               type="button"
-              className="sticker-btn w-full !bg-rose-600 !text-sm"
+              className="btn btn-tomato w-full !text-sm"
               disabled={sellAmt <= 0 || sellReq.isPending}
               onClick={() =>
                 sellReq.writeContract({
@@ -299,7 +301,7 @@ function HoldingCard({
             </button>
             <button
               type="button"
-              className="sticker-btn-outline !text-xs"
+              className="btn btn-sketch !text-xs"
               onClick={() => setSellMode(false)}
             >
               cancel
@@ -346,21 +348,21 @@ function SellCooldown({
 
   return (
     <div>
-      <p className="text-sm text-zinc-600">
+      <p className="text-sm text-ink-2">
         Cooldown:{" "}
-        <span className="font-heading font-bold text-rose-600">
+        <span className="font-display text-tomato">
           {ready ? `${daysLeft} days left` : "…"}
         </span>
       </p>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink-100">
+      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink/15">
         <div
-          className="h-full rounded-full bg-rose-500"
+          className="h-full rounded-full bg-tomato"
           style={{ width: `${(1 - daysLeft / 90) * 100}%` }}
         />
       </div>
       <button
         type="button"
-        className="sticker-btn mt-3 w-full !bg-rose-600 !text-sm"
+        className="btn btn-tomato mt-3 w-full !text-sm"
         disabled={!ready || daysLeft > 0 || executing}
         onClick={onExecute}
       >

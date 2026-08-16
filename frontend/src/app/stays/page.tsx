@@ -36,24 +36,24 @@ export default function StaysPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 pb-16 pt-14 sm:px-6 lg:px-8">
       <div className="max-w-2xl">
-        <h1 className="font-heading text-4xl font-bold tracking-tight text-ink-900 sm:text-5xl">
-          Farm <span className="text-emerald-700">Stays</span>
+        <h1 className="font-display text-5xl leading-[1.05] tracking-tight text-ink sm:text-6xl">
+          Farm <span className="paint">Stays</span>
         </h1>
-        <p className="mt-4 text-lg leading-relaxed text-zinc-600">
+        <p className="mt-4 text-lg leading-relaxed text-ink-2">
           Sleep on the land. Book a night on any batch, on-chain, in mUSDC.
           Up to 7 nights and 8 guests.
         </p>
       </div>
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_360px]">
-        <section className="sticker-card overflow-hidden bg-white">
-          <div className="border-b-2 border-ink-100 px-5 py-4">
-            <h2 className="font-heading text-2xl font-bold text-ink-900">Book a stay</h2>
+        <section className="sketch overflow-hidden bg-white">
+          <div className="border-b-2 border-ink/20 px-5 py-4">
+            <h2 className="font-display text-3xl text-ink">Book a stay</h2>
           </div>
           <div className="p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-sm font-semibold text-zinc-600">batch</label>
+                <label className="text-sm font-semibold text-ink-2">batch</label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {BATCHES.map((b) => (
                     <button
@@ -62,8 +62,8 @@ export default function StaysPage() {
                       onClick={() => setSel(b.id)}
                       className={`rounded-full border-2 px-3 py-1.5 text-sm font-semibold transition-all duration-150 ${
                         sel === b.id
-                          ? "border-ink-800 bg-emerald-600 text-white shadow-[2px_2px_0_0_var(--color-forest)]"
-                          : "border-transparent text-ink-600 hover:border-ink-800 hover:bg-white hover:shadow-[2px_2px_0_0_var(--color-forest)]"
+                          ? "border-ink bg-ink text-paper shadow-[2px_2px_0_rgba(43,38,29,0.25)]"
+                          : "border-transparent text-ink-2 hover:border-ink hover:bg-white"
                       }`}
                     >
                       {b.emoji} {b.cropType}
@@ -74,52 +74,52 @@ export default function StaysPage() {
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <label className="text-sm font-semibold text-zinc-600">check-in</label>
+                  <label className="text-sm font-semibold text-ink-2">check-in</label>
                   <input
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="input-ledger mt-2"
+                    className="input-sketch mt-2"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-zinc-600">nights (≤7)</label>
+                  <label className="text-sm font-semibold text-ink-2">nights (≤7)</label>
                   <input
                     type="number"
                     min="1"
                     max="7"
                     value={nights}
                     onChange={(e) => setNights(e.target.value)}
-                    className="input-ledger mt-2"
+                    className="input-sketch mt-2"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-zinc-600">guests (≤8)</label>
+                  <label className="text-sm font-semibold text-ink-2">guests (≤8)</label>
                   <input
                     type="number"
                     min="1"
                     max="8"
                     value={guests}
                     onChange={(e) => setGuests(e.target.value)}
-                    className="input-ledger mt-2"
+                    className="input-sketch mt-2"
                   />
                 </div>
               </div>
             </div>
 
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm text-zinc-600">
+              <div className="text-sm text-ink-2">
                 {getBatchMeta(sel).cropType} night rate:{" "}
-                <span className="font-heading font-bold text-ink-900">
+                <span className="font-display text-ink">
                   {price !== undefined ? `${fmtUSDC(price)} mUSDC` : "…"}
                 </span>
                 {price !== undefined && (
-                  <span className="ml-2 font-heading text-lg font-bold text-emerald-700">
+                  <span className="ml-2 font-display text-lg text-sage-2">
                     {nightsN} nights = {fmtUSDC(total)} mUSDC
                   </span>
                 )}
               </div>
-              <span className="sticker-btn pointer-events-none cursor-default opacity-90 !px-4 !py-1.5 !text-sm">
+              <span className="chip pointer-events-none cursor-default bg-white opacity-90">
                 Check availability
               </span>
             </div>
@@ -133,14 +133,14 @@ export default function StaysPage() {
                   className="overflow-hidden"
                 >
                   {available ? (
-                    <div className="mt-4 rounded-xl bg-emerald-50 p-4">
-                      <p className="font-heading text-xl font-bold text-emerald-700">
+                    <div className="sketch-soft mt-4 bg-sage-50 p-4">
+                      <p className="font-display text-xl text-sage-2">
                         ✓ Available! {dayToDate(day!)} is free.
                       </p>
                       {!isConnected ? (
                         <ConnectButton.Custom>
                           {({ openConnectModal }) => (
-                            <button type="button" onClick={openConnectModal} className="sticker-btn mt-3">
+                            <button type="button" onClick={openConnectModal} className="btn btn-fill mt-3">
                               Connect wallet to book
                             </button>
                           )}
@@ -150,13 +150,13 @@ export default function StaysPage() {
                           initial={{ scale: 0.85, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
                         >
-                          <p className="mt-3 font-heading text-2xl font-bold text-emerald-700">
+                          <p className="mt-3 font-display text-2xl text-sage-2">
                             Stay booked on-chain! 🎉
                           </p>
-                          <p className="text-sm text-zinc-600">
+                          <p className="text-sm text-ink-2">
                             {dayToDate(day!)} · {nightsN} night{nightsN > 1 ? "s" : ""} · {guestsN} guest{guestsN > 1 ? "s" : ""}
                           </p>
-                          <span className="sticker-btn mt-3 pointer-events-none cursor-default opacity-90 !px-4 !py-1.5 !text-sm">
+                          <span className="chip mt-3 pointer-events-none cursor-default bg-white opacity-90">
                             Done
                           </span>
                         </motion.div>
@@ -164,7 +164,7 @@ export default function StaysPage() {
                         <div className="mt-3 flex flex-wrap gap-3">
                           <button
                             type="button"
-                            className="sticker-btn"
+                            className="btn btn-fill"
                             disabled={book.isPending}
                             onClick={() =>
                               book.writeContract({
@@ -177,22 +177,22 @@ export default function StaysPage() {
                           >
                             {book.isPending ? "Booking…" : `Confirm booking · ${fmtUSDC(total)} mUSDC`}
                           </button>
-                          <button type="button" className="sticker-btn-outline" onClick={() => setDate("")}>
+                          <button type="button" className="btn btn-sketch" onClick={() => setDate("")}>
                             Pick another date
                           </button>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="mt-4 rounded-xl bg-rose-50 p-4">
-                      <p className="font-heading text-xl font-bold text-rose-600">
+                    <div className="sketch-soft mt-4 bg-tomato/10 p-4">
+                      <p className="font-display text-xl text-tomato">
                         {booked === true
                           ? stay
-                            ? `✗ Taken by ${stay.booker.slice(0, 6)}… — pick another date`
-                            : "✗ Not available — pick another date"
+                            ? `✗ Taken by ${stay.booker.slice(0, 6)}…, pick another date`
+                            : "✗ Not available, pick another date"
                           : "Checking…"}
                       </p>
-                      <button type="button" className="sticker-btn-outline mt-3" onClick={() => setDate("")}>
+                      <button type="button" className="btn btn-sketch mt-3" onClick={() => setDate("")}>
                         Pick another date
                       </button>
                     </div>
@@ -203,12 +203,12 @@ export default function StaysPage() {
           </div>
         </section>
 
-        <section className="sticker-card bg-white p-5">
-          <h2 className="font-heading text-2xl font-bold text-ink-900">My stays</h2>
+        <section className="sketch bg-white p-5">
+          <h2 className="font-display text-2xl text-ink">My stays</h2>
           {!isConnected ? (
-            <p className="mt-3 text-sm text-zinc-600">Connect a wallet to see your stays.</p>
+            <p className="mt-3 text-sm text-ink-2">Connect a wallet to see your stays.</p>
           ) : myBookings.bookings.length === 0 ? (
-            <p className="mt-3 text-sm text-zinc-600">No stays booked yet.</p>
+            <p className="mt-3 text-sm text-ink-2">No stays booked yet.</p>
           ) : (
             <div className="mt-3 space-y-3">
               {myBookings.bookings.map((bk, i) => (
@@ -240,19 +240,19 @@ function StayRow({
   const stay = useGetStay(batchId, day);
   const cancel = useWriteContract();
   return (
-    <div className="rounded-xl bg-white p-3 ring-2 ring-ink-100">
+    <div className="sketch-xs bg-white p-3">
       <div className="flex items-center justify-between">
-        <p className="font-heading text-lg font-bold text-ink-900">
+        <p className="font-display text-lg text-ink">
           {meta.emoji} {meta.cropType}
         </p>
-        <span className="text-sm text-zinc-600">{dayToDate(day)}</span>
+        <span className="text-sm text-ink-2">{dayToDate(day)}</span>
       </div>
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-ink-3">
         {stay ? `${stay.nights} night${stay.nights > 1 ? "s" : ""} · ${stay.guests} guest${stay.guests > 1 ? "s" : ""} · ${fmtUSDC(stay.total)} mUSDC` : ""}
       </p>
       <button
         type="button"
-        className="sticker-btn mt-2 w-full !bg-rose-600 !text-sm"
+        className="btn btn-tomato mt-2 w-full !text-sm"
         disabled={cancel.isPending}
         onClick={() =>
           cancel.writeContract({
@@ -263,7 +263,7 @@ function StayRow({
           })
         }
       >
-        {cancelReceiptSuccess ? "Cancelled — refunded ✓" : "Cancel stay (refund)"}
+        {cancelReceiptSuccess ? "Cancelled, refunded ✓" : "Cancel stay (refund)"}
       </button>
     </div>
   );

@@ -43,26 +43,26 @@ export default function AddTokensPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 pb-16 pt-14 sm:px-6 lg:px-8">
       <div className="max-w-2xl">
-        <h1 className="font-heading text-4xl font-bold tracking-tight text-ink-900 sm:text-5xl">
-          Token <span className="text-emerald-700">registry</span>
+        <h1 className="font-display text-5xl leading-[1.05] tracking-tight text-ink sm:text-6xl">
+          Token <span className="paint">registry</span>
         </h1>
-        <p className="mt-4 text-lg leading-relaxed text-zinc-600">
-          Everything you trade with, on <span className="font-semibold text-emerald-700">Monad Testnet</span>.
+        <p className="mt-4 text-lg leading-relaxed text-ink-2">
+          Everything you trade with, on <span className="font-semibold text-sage-2">Monad Testnet</span>.
           Grab mUSDC from the faucet, then add any token to your wallet in one tap.
         </p>
       </div>
 
       {!isConnected ? (
         <div className="mt-10">
-          <div className="sticker-card mx-auto max-w-md bg-white p-8 text-center">
+          <div className="sketch mx-auto max-w-md bg-white p-8 text-center">
             <p className="text-4xl">🔑</p>
-            <h2 className="mt-3 font-heading text-2xl font-bold text-ink-900">Connect your wallet</h2>
-            <p className="mt-2 text-sm text-zinc-600">
+            <h2 className="mt-3 font-display text-2xl text-ink">Connect your wallet</h2>
+            <p className="mt-2 text-sm text-ink-2">
               You need a wallet to claim the faucet and add tokens.
             </p>
             <ConnectButton.Custom>
               {({ openConnectModal }) => (
-                <button type="button" onClick={openConnectModal} className="sticker-btn mt-5">
+                <button type="button" onClick={openConnectModal} className="btn btn-fill mt-5">
                   Connect wallet
                 </button>
               )}
@@ -71,16 +71,16 @@ export default function AddTokensPage() {
         </div>
       ) : (
         <div>
-          <div className="sticker-card mt-10 flex flex-wrap items-center justify-between gap-4 bg-white p-5">
+          <div className="sketch mt-10 flex flex-wrap items-center justify-between gap-4 bg-white p-5">
             <div>
-              <p className="font-heading text-2xl font-bold text-ink-900">mUSDC faucet</p>
-              <p className="text-sm text-zinc-600">
+              <p className="font-display text-2xl text-ink">mUSDC faucet</p>
+              <p className="text-sm text-ink-2">
                 One-time 50,000 mUSDC per address on Monad Testnet.
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-zinc-500">your balance</p>
-              <p className="font-heading text-3xl font-bold tabular text-emerald-700">{fmtUSDC(balance)} mUSDC</p>
+              <p className="text-xs text-ink-3">your balance</p>
+              <p className="font-display text-3xl text-sage-2">{fmtUSDC(balance)} mUSDC</p>
             </div>
             <AnimatePresence mode="wait">
               {faucetClaimed ? (
@@ -88,18 +88,18 @@ export default function AddTokensPage() {
                   key="ok"
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="sticker-badge bg-emerald-50 text-emerald-700"
+                  className="chip bg-sage-50"
                 >
                   Faucet claimed! +50,000 mUSDC 🎉
                 </motion.p>
               ) : hasClaimed ? (
-                <span className="sticker-badge bg-ink-50 text-zinc-500">
-                  Already claimed — add more via any faucet
+                <span className="chip bg-paper-2">
+                  Already claimed, add more via any faucet
                 </span>
               ) : (
                 <button
                   type="button"
-                  className="sticker-btn"
+                  className="btn btn-sun"
                   disabled={faucet.isPending}
                   onClick={() =>
                     faucet.writeContract({
@@ -115,13 +115,13 @@ export default function AddTokensPage() {
             </AnimatePresence>
           </div>
 
-          <div className="sticker-card mt-8 overflow-hidden bg-white">
-            <div className="border-b-2 border-ink-800 bg-ink-100 px-5 py-4">
-              <p className="font-heading text-2xl font-bold text-ink-900">
-                Registry · <span className="text-emerald-700">Monad Testnet</span> (chain 10143)
+          <div className="sketch mt-8 overflow-hidden bg-white">
+            <div className="border-b-2 border-ink/20 bg-paper-2 px-5 py-4">
+              <p className="font-display text-2xl text-ink">
+                Registry · <span className="text-sage-2">Monad Testnet</span> (chain 10143)
               </p>
             </div>
-            <div className="divide-y-2 divide-ink-100">
+            <div className="divide-y-2 divide-ink/10">
               {tokens.map((t) => (
                 <div
                   key={t.address}
@@ -130,23 +130,23 @@ export default function AddTokensPage() {
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{t.emoji}</span>
                     <div>
-                      <p className="font-heading text-lg font-bold leading-none text-ink-900">
-                        {t.name} <span className="text-sm font-medium text-zinc-500">({t.symbol})</span>
+                      <p className="font-display text-lg leading-none text-ink">
+                        {t.name} <span className="text-sm font-medium text-ink-3">({t.symbol})</span>
                       </p>
-                      <p className="mt-0.5 break-all font-mono text-xs text-zinc-500">
+                      <p className="mt-0.5 break-all font-mono text-xs text-ink-3">
                         {t.address}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     {t.balance !== undefined && (
-                      <span className="font-heading font-bold tabular text-ink-900">
+                      <span className="font-display text-ink">
                         {fmtTokens(t.balance)} {t.symbol}
                       </span>
                     )}
                     <button
                       type="button"
-                      className="sticker-btn-outline !rounded-full !px-3 !py-1.5 !text-sm"
+                      className="btn btn-sketch !rounded-full !px-3 !py-1.5 !text-sm"
                       onClick={() => watchToken(t, setWatching)}
                     >
                       {watching === t.address ? "Adding…" : "+ Add to wallet"}
@@ -157,12 +157,12 @@ export default function AddTokensPage() {
             </div>
           </div>
 
-          <p className="mt-6 text-center text-xs text-zinc-500">
+          <p className="mt-6 text-center text-xs text-ink-3">
             Need more MON for gas? Grab it from the{" "}
-            <a href="https://faucet.monad.xyz" target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 underline decoration-2 underline-offset-2">
+            <a href="https://faucet.monad.xyz" target="_blank" rel="noreferrer" className="font-semibold text-sage-2 underline decoration-2 underline-offset-2">
               Monad faucet
             </a>{" "}
-            — every write above costs gas.
+            · every write above costs gas.
           </p>
         </div>
       )}

@@ -27,6 +27,12 @@ export const RPC_URLS = [
 
 export const CHAIN_ID = 10143;
 
+export const ADMIN_ADDRESS = "0x1B8Cd7Ec63D6c725AE57AB6DbC6Ea90A10a90C32" as `0x${string}`;
+
+export function isAdminAddress(address: `0x${string}` | undefined): boolean {
+  return !!address && address.toLowerCase() === ADMIN_ADDRESS.toLowerCase();
+}
+
 export const CONTRACT_ADDRESSES = {
   mockUSDC: deployed.mockUSDC as `0x${string}`,
   factory: deployed.factory as `0x${string}`,
