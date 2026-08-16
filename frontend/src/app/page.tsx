@@ -7,6 +7,7 @@ import { SiteSection } from "@/components/site/section";
 import { Reveal } from "@/components/site/reveal";
 import { TokenLine } from "@/components/tokens/token-line";
 import { TOKEN_REGISTRY, type RegistryToken } from "@/lib/tokens";
+import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 
 const stayLines = [
   "Weekend · 2 nights",
@@ -107,6 +108,26 @@ export default function Home() {
                 Open the full registry
                 <ArrowRight className="h-4 w-4" />
               </Link>
+            </div>
+          </div>
+        </Reveal>
+      </SiteSection>
+
+      <SiteSection id="waitlist" className="py-20">
+        <Reveal>
+          <div className="sticker-card bg-gradient-to-b from-amber-50 to-white p-8 sm:p-12 text-center">
+            <div className="mx-auto max-w-xl">
+              <span className="inline-flex items-center gap-2 rounded-full border-2 border-ink-800 bg-amber-100 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-900 mb-6">
+                Early Access
+              </span>
+              <h2 className="font-heading text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
+                Be first to the field.
+              </h2>
+              <p className="mt-4 text-lg leading-relaxed text-zinc-600">
+                We're opening parcels in limited batches. Join the waitlist to get priority access
+                when the next drop goes live — plus early-bird pricing on your first stay.
+              </p>
+              <WaitlistForm />
             </div>
           </div>
         </Reveal>

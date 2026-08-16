@@ -7,6 +7,7 @@ import { useAccount } from "wagmi";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { isAdminAddress } from "@/lib/config";
+import { ClientOnly } from "@/lib/client-only";
 
 function useSafeAccount() {
   try {
@@ -16,16 +17,34 @@ function useSafeAccount() {
   }
 }
 
-export function Header() {
+function AdminNavLink({ pathname }: { pathname: string }) {
   const { address } = useSafeAccount();
-  const pathname = usePathname();
   const isAdmin = isAdminAddress(address as `0x${string}` | undefined);
+
+  if (!isAdmin) return null;
+
+  return (
+    <Link
+      href="/admin"
+      className={cn(
+        "rounded-full px-3.5 py-1.5 text-sm font-semibold transition-all duration-150",
+        pathname === "/admin"
+          ? "border-2 border-ink-800 bg-sage-600 text-sage-50 shadow-[2px_2px_0_0_oklch(0.2_0.05_152)]"
+          : "border-2 border-transparent text-ink-600 hover:border-ink-800 hover:bg-white hover:text-ink-900 hover:shadow-[2px_2px_0_0_oklch(0.2_0.05_152)]"
+      )}
+    >
+      Farm Ops
+    </Link>
+  );
+}
+
+export function Header() {
+  const pathname = usePathname();
 
   const navLinks = [
     { href: "/marketplace", label: "Parcels" },
     { href: "/portfolio", label: "Cropfolio" },
     { href: "/stays", label: "Stays" },
-    ...(isAdmin ? [{ href: "/admin", label: "Farm Ops" }] : []),
   ];
 
   return (
@@ -33,7 +52,7 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-8">
           <Link href="/" className="group flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-ink-800 bg-sage-600 text-sage-50 shadow-[3px_3px_0_0_oklch(0.2_0.05_152)] transition-transform duration-150 group-hover:-translate-y-0.5 group-active:translate-y-0">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-ink-800 bg-primary-600 text-primary-50 shadow-[3px_3px_0_0_oklch(0.2_0.05_152)] transition-transform duration-150 group-hover:-translate-y-0.5 group-active:translate-y-0">
               <Sprout className="h-5 w-5" />
             </span>
             <span className="flex flex-col leading-none">
@@ -53,13 +72,16 @@ export function Header() {
                 className={cn(
                   "rounded-full px-3.5 py-1.5 text-sm font-semibold transition-all duration-150",
                   pathname === link.href
-                    ? "border-2 border-ink-800 bg-sage-600 text-sage-50 shadow-[2px_2px_0_0_oklch(0.2_0.05_152)]"
+                    ? "border-2 border-ink-800 bg-primary-600 text-primary-50 shadow-[2px_2px_0_0_oklch(0.2_0.05_152)]"
                     : "border-2 border-transparent text-ink-600 hover:border-ink-800 hover:bg-white hover:text-ink-900 hover:shadow-[2px_2px_0_0_oklch(0.2_0.05_152)]"
                 )}
               >
                 {link.label}
               </Link>
             ))}
+            <ClientOnly>
+              <AdminNavLink pathname={pathname} />
+            </ClientOnly>
           </nav>
         </div>
         <ConnectButton

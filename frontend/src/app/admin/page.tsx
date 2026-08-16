@@ -9,6 +9,7 @@ import LandBatchAbi from "@/lib/abi/LandBatch.json";
 import LandBatchFactoryAbi from "@/lib/abi/LandBatchFactory.json";
 import MockUSDCAbi from "@/lib/abi/MockUSDC.json";
 import { PageHeader } from "@/components/site/page-header";
+import { WaitlistAdmin } from "@/components/waitlist/waitlist-admin";
 
 const TABS = [
   { id: "batches", label: "Batches" },
@@ -16,6 +17,7 @@ const TABS = [
   { id: "harvest", label: "Harvest & Time" },
   { id: "clips", label: "Daily Clips" },
   { id: "create", label: "Create Batch" },
+  { id: "waitlist", label: "Waitlist" },
 ] as const;
 
 const GROWTH_STAGES = ["Seedling", "Vegetative", "Flowering", "Fruiting", "Harvest Ready"];
@@ -283,6 +285,8 @@ export default function Admin() {
           {activeTab === "clips" && <ClipsTab />}
 
           {activeTab === "create" && <CreateBatchTab />}
+
+          {activeTab === "waitlist" && <WaitlistAdmin />}
         </>
       )}
     </div>
