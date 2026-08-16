@@ -1,430 +1,720 @@
 "use client";
 
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { AnimatePresence, motion } from "framer-motion";
-import { useMemo, useState } from "react";
-import { useAccount, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { ADMIN_ADDRESS, BATCHES, CONTRACT_ADDRESSES, getBatchMeta, isAdminAddress } from "@/lib/config";
-import {
-  batchAddress,
-  factoryAbi,
-  landBatchAbi,
-  useBatch,
-} from "@/lib/contracts";
-import { dayToDate, fmtUSDC, fmtWhole, pct } from "@/lib/format";
+import { useState } from "react";
+import { useAccount, useReadContract, useWriteContract, usePublicClient } from "wagmi";
+import { formatUnits } from "viem";
+import { allBatches, getBatchAddress, saveCreatedBatch, CONTRACT_ADDRESSES, isAdminAddress, type LandBatch } from "@/lib/config";
 
-export default function AdminPage() {
-  const { address, isConnected } = useAccount();
-  const isAdmin = isConnected && isAdminAddress(address);
+import LandBatchAbi from "@/lib/abi/LandBatch.json";
+import LandBatchFactoryAbi from "@/lib/abi/LandBatchFactory.json";
+import MockUSDCAbi from "@/lib/abi/MockUSDC.json";
+import { PageHeader } from "@/components/site/page-header";
+
+const TABS = [
+  { id: "batches", label: "Batches" },
+  { id: "milestones", label: "Milestones" },
+  { id: "harvest", label: "Harvest & Time" },
+  { id: "clips", label: "Daily Clips" },
+  { id: "create", label: "Create Batch" },
+] as const;
+
+const GROWTH_STAGES = ["Seedling", "Vegetative", "Flowering", "Fruiting", "Harvest Ready"];
+
+const isSafeUrl = (url: string) => /^(https?|ipfs):\/\//i.test(url);
+
+function useSafeAccount() {
+  try {
+    return useAccount();
+  } catch {
+    return { isConnected: false, address: undefined };
+  }
+}
+
+function fmt(value: unknown, decimals = 18, digits = 2) {
+  if (value === undefined || value === null) return "—";
+  return Number(formatUnits(value as bigint, decimals)).toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+function fmtInt(value: unknown) {
+  if (value === undefined || value === null) return "—";
+  return Number(value).toString();
+}
+
+function BatchAdmin({ batch }: { batch: LandBatch }) {
+  const addr = getBatchAddress(batch);
+  const enabled = !!addr;
+  const { address: userAddr } = useSafeAccount();
+
+  const { data: soldTokens } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "soldTokens", query: { enabled } });
+  const { data: buybackReserve } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "buybackReserve", query: { enabled } });
+  const { data: currentYear } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "currentYear", query: { enabled } });
+  const { data: growthStage } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "growthStage", query: { enabled } });
+  const { data: cropCycleYears } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "cropCycleYears", query: { enabled } });
+  const { data: cropNumber } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "cropNumber", query: { enabled } });
+  const { data: investorShareBps } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "investorShareBps", query: { enabled } });
+  const { data: farmer } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "farmer", query: { enabled } });
+  const { data: usdcAllowance } = useReadContract({
+    address: CONTRACT_ADDRESSES.mockUSDC as `0x${string}`,
+    abi: MockUSDCAbi,
+    functionName: "allowance",
+    args: userAddr && addr ? [userAddr, addr] : undefined,
+    query: { enabled: !!userAddr && !!addr },
+  });
+
+  const { writeContractAsync, isPending } = useWriteContract();
+  const publicClient = usePublicClient();
+  const [stageSel, setStageSel] = useState("0");
+  const [revenueAmt, setRevenueAmt] = useState("");
+  const [clipUrl, setClipUrl] = useState("");
+  const [statusMsg, setStatusMsg] = useState("");
+
+  const waitForTx = async (hash: `0x${string}`) => {
+    if (!publicClient) throw new Error("No public client");
+    return publicClient.waitForTransactionReceipt({ hash, timeout: 60_000, retryCount: 20 });
+  };
+
+  const doWrite = async (fn: () => Promise<`0x${string}`>) => {
+    try {
+      const hash = await fn();
+      setStatusMsg("Transaction submitted — confirming...");
+      const receipt = await waitForTx(hash);
+      setStatusMsg(receipt.status === "success" ? "Done." : "Transaction failed on-chain.");
+    } catch (e: any) {
+      const msg = String(e?.message || "");
+      if (msg.includes("rejected")) setStatusMsg("You rejected the transaction.");
+      else setStatusMsg((msg.length > 90 ? msg.slice(0, 90) + "..." : msg) || "Transaction failed.");
+    }
+  };
+
+  const handleDistribute = async () => {
+    const amt = Number(revenueAmt);
+    if (!amt || amt <= 0) {
+      setStatusMsg("Enter a revenue amount first.");
+      return;
+    }
+    if (!addr) return;
+    const wei = BigInt(Math.round(amt * 10 ** 18));
+    const allowance = usdcAllowance as bigint | undefined;
+    if (allowance !== undefined && allowance < wei) {
+      setStatusMsg("Step 1/2 — Approving USDC to the batch, confirm in your wallet...");
+      try {
+        const approveHash = await writeContractAsync({
+          address: CONTRACT_ADDRESSES.mockUSDC as `0x${string}`,
+          abi: MockUSDCAbi,
+          functionName: "approve",
+          args: [addr as `0x${string}`, wei],
+        });
+        const approveReceipt = await waitForTx(approveHash);
+        if (approveReceipt.status !== "success") {
+          setStatusMsg("Approve failed on-chain. Try again.");
+          return;
+        }
+      } catch (e: any) {
+        const msg = String(e?.message || "");
+        setStatusMsg(msg.includes("rejected") ? "You rejected the approval." : (msg.length > 90 ? msg.slice(0, 90) + "..." : msg) || "Approve failed.");
+        return;
+      }
+    }
+    setStatusMsg("Step 2/2 — Distributing revenue, confirm in your wallet...");
+    await doWrite(() =>
+      writeContractAsync({ address: addr as `0x${string}`, abi: LandBatchAbi, functionName: "distributeRevenue", args: [wei] })
+    );
+  };
+
+  const handleUploadClip = async () => {
+    const trimmed = clipUrl.trim();
+    if (!trimmed) {
+      setStatusMsg("Enter a clip URL first.");
+      return;
+    }
+    if (!isSafeUrl(trimmed)) {
+      setStatusMsg("Clip URL must start with https:// or ipfs://");
+      return;
+    }
+    await doWrite(() => writeContractAsync({ address: addr as `0x${string}`, abi: LandBatchAbi, functionName: "uploadClip", args: [trimmed] }));
+  };
+
+  const share = investorShareBps !== undefined ? (Number(investorShareBps) / 100).toFixed(1) + "%" : "—";
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-16 pt-14 sm:px-6 lg:px-8">
-      <div className="max-w-2xl">
-        <h1 className="font-display text-5xl leading-[1.05] tracking-tight text-ink sm:text-6xl">
-          Farm <span className="paint">Ops</span>
-        </h1>
-        <p className="mt-4 text-lg leading-relaxed text-ink-2">
-          Run the farm: advance years, distribute revenue, manage milestones,
-          clips and batches, straight into the contracts.
-        </p>
+    <div key={batch.id} className="sticker-card bg-white p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="font-heading text-lg font-bold text-ink-900">{batch.cropType}</h3>
+        <span className="sticker-badge bg-ink-100 text-ink-800">
+          Crop {fmtInt(cropNumber)} · Year {fmtInt(currentYear)}/{fmtInt(cropCycleYears)} · {GROWTH_STAGES[Number(growthStage ?? BigInt(0))] ?? GROWTH_STAGES[0]} · {share} investor
+        </span>
       </div>
 
-      {!isConnected ? (
-        <div className="mt-10">
-          <div className="sketch mx-auto max-w-md bg-white p-8 text-center">
-            <p className="text-4xl">🔐</p>
-            <h2 className="mt-3 font-display text-2xl text-ink">Admin console</h2>
-            <p className="mt-2 text-sm text-ink-2">
-              Farm Ops is gated to the farm admin wallet.
-            </p>
-            <ConnectButton.Custom>
-              {({ openConnectModal }) => (
-                <button type="button" onClick={openConnectModal} className="btn btn-fill mt-5">
-                  Connect wallet
-                </button>
-              )}
-            </ConnectButton.Custom>
-          </div>
-        </div>
-      ) : isAdmin ? (
+      <div className="mb-4 grid grid-cols-3 gap-4 text-sm">
         <div>
-          <div className="sketch mt-10 flex flex-wrap items-center justify-between gap-3 bg-white p-4">
-            <p className="font-display text-lg text-ink">
-              Admin: <span className="font-mono text-sm text-ink-3">{ADMIN_ADDRESS}</span>
-            </p>
-            <span className="chip bg-sage-50">
-              <span className="h-2 w-2 rounded-full bg-sage-2" />
-              admin access
-            </span>
-          </div>
-          <AdminPanels />
+          <span className="text-zinc-500">Acres: </span>
+          <span className="text-zinc-300">{batch.acres}</span>
         </div>
-      ) : (
-        <div className="mt-10">
-          <div className="sketch mx-auto max-w-md bg-white p-8 text-center">
-            <p className="text-4xl">⛔</p>
-            <h2 className="mt-3 font-display text-2xl text-ink">Access denied</h2>
-            <p className="mt-2 text-sm text-ink-2">
-              This console is only available to the farm admin wallet. Browse the
-              marketplace or check your cropfolio instead.
-            </p>
-            <a href="/marketplace" className="btn btn-sketch mt-5">
-              Go to the marketplace
-            </a>
-          </div>
+        <div>
+          <span className="text-zinc-500">Tokens Sold: </span>
+          <span className="text-zinc-300">{fmt(soldTokens)} / {Number(batch.totalSupply).toLocaleString()}</span>
         </div>
+        <div>
+          <span className="text-zinc-500">Buyback Reserve: </span>
+          <span className="text-emerald-700">{fmt(buybackReserve)} mUSDC</span>
+        </div>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => doWrite(() => writeContractAsync({ address: addr as `0x${string}`, abi: LandBatchAbi, functionName: "advanceYear" }))}
+          disabled={isPending}
+          className="sticker-btn sticker-btn-outline !px-4 !py-2 text-sm !text-emerald-700"
+        >
+          Advance Year
+        </button>
+        <select
+          value={stageSel}
+          onChange={(e) => setStageSel(e.target.value)}
+          className="rounded-xl border-2 border-ink-800 bg-white px-3 py-2 text-sm font-semibold text-ink-900"
+        >
+          {GROWTH_STAGES.map((s, i) => (
+            <option key={s} value={String(i)}>{s}</option>
+          ))}
+        </select>
+        <button
+          onClick={() => doWrite(() => writeContractAsync({ address: addr as `0x${string}`, abi: LandBatchAbi, functionName: "setGrowthStage", args: [BigInt(stageSel)] }))}
+          disabled={isPending}
+          className="sticker-btn sticker-btn-outline !px-4 !py-2 text-sm"
+        >
+          Set Growth Stage
+        </button>
+        <input
+          type="number"
+          placeholder="Revenue (mUSDC)"
+          value={revenueAmt}
+          onChange={(e) => setRevenueAmt(e.target.value)}
+          className="w-40 rounded-xl border-2 border-ink-800 bg-white px-3 py-2 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+        />
+        <button
+          onClick={handleDistribute}
+          disabled={isPending}
+          className="sticker-btn sticker-btn-amber !px-4 !py-2 text-sm"
+        >
+          Distribute Revenue
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          placeholder="Clip URL (IPFS/video link)"
+          value={clipUrl}
+          onChange={(e) => setClipUrl(e.target.value)}
+          className="w-72 rounded-xl border-2 border-ink-800 bg-white px-3 py-2 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+        />
+        <button
+          onClick={handleUploadClip}
+          disabled={isPending}
+          className="sticker-btn sticker-btn-outline !px-4 !py-2 text-sm"
+        >
+          Upload Clip
+        </button>
+        {!!farmer && (
+          <span className="text-xs text-zinc-600">Farmer: {String(farmer).slice(0, 6)}...{String(farmer).slice(-4)}</span>
+        )}
+      </div>
+
+      {statusMsg && <p className="mt-3 text-xs text-zinc-500 break-words">{statusMsg}</p>}
+    </div>
+  );
+}
+
+export default function Admin() {
+  const { isConnected, address } = useSafeAccount();
+  const [activeTab, setActiveTab] = useState<string>("batches");
+  const isAdmin = isAdminAddress(address as `0x${string}` | undefined);
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+      <PageHeader
+        title="Farm Ops"
+        subtitle="Manage your batches, milestones, harvests, and daily clips — every write lands on-chain."
+      />
+
+      {!isConnected && (
+        <div className="sticker-card bg-white p-6 text-center text-sm font-semibold text-zinc-500">
+          Connect your wallet to manage farm operations
+        </div>
+      )}
+
+      {isConnected && !isAdmin && (
+        <div className="sticker-card bg-rose-50 p-6 text-center">
+          <p className="font-heading text-xl font-bold text-ink-900">Farm Ops is admin-only</p>
+          <p className="mt-2 text-sm font-semibold text-zinc-600">
+            Your wallet is not the farm admin. The contracts only accept farm operations from the
+            admin address, so there is nothing to manage here.
+          </p>
+        </div>
+      )}
+
+      {isConnected && isAdmin && (
+        <>
+          <div className="mb-6 flex flex-wrap gap-2">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`sticker-btn !rounded-full !px-4 !py-2.5 text-sm ${
+                  activeTab === tab.id ? "sticker-btn-amber" : "sticker-btn-outline !text-zinc-500"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "batches" && (
+            <div className="animate-pop-in space-y-4">
+              {allBatches().map((batch) => (
+                <BatchAdmin key={batch.id} batch={batch} />
+              ))}
+            </div>
+          )}
+
+          {activeTab === "milestones" && <MilestonesTab />}
+
+          {activeTab === "harvest" && <HarvestTab />}
+
+          {activeTab === "clips" && <ClipsTab />}
+
+          {activeTab === "create" && <CreateBatchTab />}
+        </>
       )}
     </div>
   );
 }
 
-function AdminPanels() {
-  const [sel, setSel] = useState(0);
+function MilestonesTab() {
   return (
-    <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]">
-      <div className="flex flex-col gap-8">
-        <BatchAdminPanel id={sel} />
-        <MilestonesPanel id={sel} />
-        <ClipPanel id={sel} />
-        <CreateBatchPanel />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <p className="font-display text-2xl text-ink">pick a batch</p>
-        <div className="grid grid-cols-2 gap-2">
-          {BATCHES.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => setSel(b.id)}
-              className={`rounded-full border-2 px-3 py-2 text-sm font-semibold transition-all duration-150 ${
-                sel === b.id
-                  ? "border-ink bg-ink text-paper shadow-[2px_2px_0_rgba(43,38,29,0.25)]"
-                  : "border-transparent text-ink-2 hover:border-ink hover:bg-white"
-              }`}
-            >
-              {b.emoji} {b.cropType}
-            </button>
-          ))}
-        </div>
-        <BatchSummary id={sel} />
-      </div>
+    <div className="animate-pop-in space-y-4">
+      {allBatches().map((batch) => (
+        <BatchMilestones key={batch.id} batch={batch} />
+      ))}
     </div>
   );
 }
 
-function BatchSummary({ id }: { id: number }) {
-  const b = useBatch(id);
-  const d = b.data;
-  return (
-    <div className="sketch-soft bg-paper-2 p-4 text-sm">
-      <p className="font-display text-lg text-ink">{getBatchMeta(id).cropType}</p>
-      <p className="mt-1 text-ink-2">Tokens Sold: <span className="font-display text-ink">{fmtTokens(d.soldTokens)}</span></p>
-      <p className="text-ink-2">Revenue (mUSDC) distributed: <span className="font-display text-ink">{fmtUSDC(d.totalRevenueDistributed)}</span></p>
-      <p className="text-ink-2">Buyback reserve: <span className="font-display text-ink">{fmtUSDC(d.buybackReserve)}</span></p>
-    </div>
-  );
-}
-
-function BatchAdminPanel({ id }: { id: number }) {
-  const b = useBatch(id);
-  const d = b.data;
-  const [rev, setRev] = useState("");
-  const [step, setStep] = useState<1 | 2>(1);
-
-  const advance = useWriteContract();
-  const distribute = useWriteContract();
-  const advanceReceipt = useWaitForTransactionReceipt({ hash: advance.data });
-  const distReceipt = useWaitForTransactionReceipt({ hash: distribute.data });
-
-  const revAmt = useMemo(() => {
-    const n = Number(rev || "0");
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  }, [rev]);
-
-  const addr = batchAddress(id)!;
-
-  return (
-    <section className="sketch overflow-hidden bg-white">
-      <div className="border-b-2 border-ink/20 px-5 py-4">
-        <h2 className="font-display text-3xl text-ink">Batch ops · {getBatchMeta(id).cropType}</h2>
-      </div>
-      <div className="grid gap-4 p-5 sm:grid-cols-2">
-        <div className="sketch-soft bg-paper-2 p-4">
-          <p className="text-xs font-semibold text-ink-3">current year</p>
-          <p className="font-display text-4xl text-ink">{fmtWhole(d.currentYear)}</p>
-          <button
-            type="button"
-            className="btn btn-fill mt-3 w-full !text-sm"
-            disabled={advance.isPending}
-            onClick={() =>
-              advance.writeContract({ address: addr, abi: landBatchAbi, functionName: "advanceYear" })
-            }
-          >
-            {advanceReceipt.isSuccess ? "Year advanced ✓" : advance.isPending ? "Advancing…" : "Advance Year"}
-          </button>
-        </div>
-
-        <div className="sketch-soft bg-paper-2 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-ink-3">investor share</p>
-            <p className="font-display text-ink">{pct(d.investorShareBps)}</p>
-          </div>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-ink/15">
-            <motion.div
-              className="h-full rounded-full bg-sage-2"
-              initial={{ width: 0 }}
-              animate={{ width: `${(Number(d.investorShareBps) / 10000) * 100}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="sketch-soft bg-harvest/20 p-4 mx-5 mb-5">
-        <p className="font-display text-xl text-ink">Distribute revenue</p>
-        <div className="mt-2 flex gap-2">
-          <input
-            type="number"
-            inputMode="decimal"
-            placeholder="Revenue (mUSDC)"
-            value={rev}
-            onChange={(e) => setRev(e.target.value)}
-            className="input-sketch"
-          />
-          <button
-            type="button"
-            className="btn btn-sun shrink-0"
-            disabled={revAmt <= 0 || distribute.isPending}
-            onClick={() => {
-              setStep(2);
-              distribute.writeContract({
-                address: addr,
-                abi: landBatchAbi,
-                functionName: "distributeRevenue",
-                args: [BigInt(Math.round(revAmt * 1_000_000_000_000_000_000))],
-              });
-            }}
-          >
-            {distribute.isPending ? "Distributing…" : "Distribute Revenue"}
-          </button>
-        </div>
-        <div className="mt-3 flex items-center gap-2 text-sm">
-          <span className="text-ink-3">progress:</span>
-          {[1, 2].map((s) => (
-            <span
-              key={s}
-              className={`flex h-7 w-7 items-center justify-center rounded-full border-2 font-display ${
-                step >= s ? "border-ink bg-ink text-paper" : "border-ink bg-white text-ink-3"
-              }`}
-            >
-              {s}
-            </span>
-          ))}
-          <span className="font-display text-ink">Step {step}/2</span>
-        </div>
-        <AnimatePresence>
-          {distReceipt.isSuccess && (
-            <motion.p
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-2 font-display text-sage-2"
-            >
-              Done. 🎉 Revenue distributed on-chain.
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </div>
-    </section>
-  );
-}
-
-function MilestonesPanel({ id }: { id: number }) {
-  const b = useBatch(id);
-  const d = b.data;
+function BatchMilestones({ batch }: { batch: LandBatch }) {
+  const addr = getBatchAddress(batch);
+  const { data: milestones } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "getMilestones", query: { enabled: !!addr } });
+  const { writeContractAsync, isPending } = useWriteContract();
+  const publicClient = usePublicClient();
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [startDay, setStartDay] = useState("");
   const [endDay, setEndDay] = useState("");
-  const [selIdx, setSelIdx] = useState(0);
+  const [statusMsg, setStatusMsg] = useState("");
 
-  const create = useWriteContract();
-  const claim = useWriteContract();
-  const createReceipt = useWaitForTransactionReceipt({ hash: create.data });
-  const claimReceipt = useWaitForTransactionReceipt({ hash: claim.data });
+  const waitForTx = async (hash: `0x${string}`) => {
+    if (!publicClient) throw new Error("No public client");
+    return publicClient.waitForTransactionReceipt({ hash, timeout: 60_000, retryCount: 20 });
+  };
 
-  const addr = batchAddress(id)!;
+  const handleCreate = async () => {
+    const amt = Number(amount);
+    if (!name.trim() || !amt || amt <= 0) {
+      setStatusMsg("Fill in name and amount first.");
+      return;
+    }
+    try {
+      const hash = await writeContractAsync({
+        address: addr as `0x${string}`,
+        abi: LandBatchAbi,
+        functionName: "createMilestone",
+        args: [name.trim(), BigInt(Math.round(amt * 10 ** 18)), BigInt(startDay || "0"), BigInt(endDay || "0")],
+      });
+      setStatusMsg("Milestone submitted — confirming...");
+      const receipt = await waitForTx(hash);
+      setStatusMsg(receipt.status === "success" ? "Milestone created." : "Failed on-chain.");
+      if (receipt.status === "success") {
+        setName("");
+        setAmount("");
+        setStartDay("");
+        setEndDay("");
+      }
+    } catch (e: any) {
+      const msg = String(e?.message || "");
+      setStatusMsg(msg.includes("rejected") ? "You rejected the transaction." : (msg.length > 90 ? msg.slice(0, 90) + "..." : msg) || "Failed.");
+    }
+  };
+
+  const ms = milestones as
+    | readonly { name: string; amount: bigint; startDay: bigint; endDay: bigint; claimed: boolean }[]
+    | undefined;
+
+  const [claimMsg, setClaimMsg] = useState("");
+
+  const handleClaim = async (index: number) => {
+    if (!addr) return;
+    try {
+      const hash = await writeContractAsync({
+        address: addr as `0x${string}`,
+        abi: LandBatchAbi,
+        functionName: "claimMilestone",
+        args: [BigInt(index)],
+      });
+      setClaimMsg("Claiming — confirming...");
+      const receipt = await waitForTx(hash);
+      setClaimMsg(receipt.status === "success" ? "Milestone claimed — USDC sent to the farmer." : "Failed on-chain.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setClaimMsg(msg.includes("rejected") ? "You rejected the transaction." : (msg.length > 90 ? msg.slice(0, 90) + "..." : msg) || "Failed.");
+    }
+  };
 
   return (
-    <section className="sketch overflow-hidden bg-white">
-      <div className="border-b-2 border-ink/20 px-5 py-4">
-        <h2 className="font-display text-3xl text-ink">Milestones</h2>
-      </div>
-      <div className="grid gap-3 p-5 sm:grid-cols-2">
-        {d.milestones.map((m, i) => (
-          <div key={i} className={`sketch-xs bg-white p-3 ${i === selIdx ? "ring-4 ring-harvest" : ""}`}>
-            <div className="flex items-center justify-between">
-              <p className="font-display text-lg text-ink">{m.name}</p>
-              <span className={`chip !px-2.5 !py-0.5 !text-xs ${m.claimed ? "bg-sage-50" : "bg-harvest/25"}`}>
-                {m.claimed ? "claimed" : "open"}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-ink-2">
-              {fmtUSDC(m.amount)} mUSDC · days {fmtWhole(m.startDay)}-{fmtWhole(m.endDay)}
-            </p>
-            <button
-              type="button"
-              className="btn btn-sketch mt-2 w-full !text-sm"
-              disabled={m.claimed || claim.isPending}
-              onClick={() => {
-                setSelIdx(i);
-                claim.writeContract({
-                  address: addr,
-                  abi: landBatchAbi,
-                  functionName: "claimMilestone",
-                  args: [BigInt(i)],
-                });
-              }}
-            >
-              {claimReceipt.isSuccess && selIdx === i ? "Milestone claimed ✓" : "Claim milestone"}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="sketch-soft mx-5 mb-5 bg-paper-2 p-4">
-        <p className="font-display text-xl text-ink">Create a milestone</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <input type="text" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} className="input-sketch" />
-          <input type="number" placeholder="Amount (mUSDC)" value={amount} onChange={(e) => setAmount(e.target.value)} className="input-sketch" />
-          <input type="date" value={startDay} onChange={(e) => setStartDay(e.target.value)} className="input-sketch" />
-          <input type="date" value={endDay} onChange={(e) => setEndDay(e.target.value)} className="input-sketch" />
+    <div className="sticker-card bg-white p-6">
+      <h3 className="mb-4 font-heading text-lg font-bold text-ink-900">{batch.cropType} — Milestones</h3>
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-4">
+          <input
+            placeholder="Name (e.g. Soil prep)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+          />
+          <input
+            type="number"
+            placeholder="Amount (mUSDC)"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+          />
+          <input
+            type="number"
+            placeholder="Start day"
+            value={startDay}
+            onChange={(e) => setStartDay(e.target.value)}
+            className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+          />
+          <input
+            type="number"
+            placeholder="End day"
+            value={endDay}
+            onChange={(e) => setEndDay(e.target.value)}
+            className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+          />
         </div>
         <button
-          type="button"
-          className="btn btn-fill mt-3 !text-sm"
-          disabled={!name || !amount || !endDay || create.isPending}
-          onClick={() =>
-            create.writeContract({
-              address: addr,
-              abi: landBatchAbi,
-              functionName: "createMilestone",
-              args: [
-                name,
-                BigInt(Math.round(Number(amount) * 1e18)),
-                BigInt(Math.floor(Date.parse(startDay || new Date().toISOString().slice(0, 10)) / 86400000)),
-                BigInt(Math.floor(Date.parse(endDay) / 86400000)),
-              ],
-            })
-          }
+          onClick={handleCreate}
+          disabled={isPending}
+          className="sticker-btn sticker-btn-amber !px-5 !py-2.5 text-sm"
         >
-          {createReceipt.isSuccess ? "Milestone created ✓" : create.isPending ? "Creating…" : "Create milestone"}
+          Create Milestone
         </button>
+        {statusMsg && <p className="text-xs font-semibold text-zinc-500 break-words">{statusMsg}</p>}
       </div>
-    </section>
+
+      <div className="mt-5 space-y-2">
+        {ms && ms.length > 0 ? (
+          ms.map((m, i) => (
+            <div key={i} className="flex items-center justify-between rounded-xl border-2 border-ink-100 bg-ink-50 px-4 py-2.5 text-sm">
+              <div>
+                <span className="font-bold text-ink-900">{m.name}</span>
+                <span className="ml-2 font-semibold text-zinc-500">
+                  {fmt(m.amount)} mUSDC · day {String(m.startDay)}
+                  {m.endDay > BigInt(0) ? `–${String(m.endDay)}` : "+"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`sticker-badge ${m.claimed ? "bg-zinc-200 text-zinc-500" : "bg-emerald-100 text-emerald-700"}`}>
+                  {m.claimed ? "Claimed" : "Pending"}
+                </span>
+                {!m.claimed && (
+                  <button
+                    onClick={() => handleClaim(i)}
+                    disabled={isPending}
+                    className="sticker-btn sticker-btn-amber !px-3 !py-1 !text-xs"
+                  >
+                    Claim
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="text-center text-sm font-semibold text-zinc-600">No milestones created yet</div>
+        )}
+      </div>
+      {claimMsg && <p className="mt-3 text-xs font-semibold text-zinc-500 break-words">{claimMsg}</p>}
+    </div>
   );
 }
 
-function ClipPanel({ id }: { id: number }) {
-  const b = useBatch(id);
-  const d = b.data;
-  const [url, setUrl] = useState("");
-  const upload = useWriteContract();
-  const upReceipt = useWaitForTransactionReceipt({ hash: upload.data });
+function HarvestTab() {
+  return (
+    <div className="animate-pop-in space-y-4">
+      {allBatches().map((batch) => (
+        <div key={batch.id} className="sticker-card bg-white p-6">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="font-heading text-lg font-bold text-ink-900">{batch.cropType}</h3>
+            <span className="sticker-badge bg-ink-100 text-ink-800">Current Year</span>
+          </div>
+          <p className="mb-4 text-xs font-semibold text-zinc-600">
+            Advance the farm one year — the investor share drops 5 points per year (70% → 0%). Growth stage is set
+            separately per batch. Distribute revenue on the Batches tab.
+          </p>
+          <BatchAdminBatchOnly batch={batch} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BatchAdminBatchOnly({ batch }: { batch: LandBatch }) {
+  const addr = getBatchAddress(batch);
+  const { data: currentYear } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "currentYear", query: { enabled: !!addr } });
+  const { data: investorShareBps } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "investorShareBps", query: { enabled: !!addr } });
+  const { data: cropNumber } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "cropNumber", query: { enabled: !!addr } });
+  const { writeContractAsync, isPending } = useWriteContract();
+  const publicClient = usePublicClient();
+  const [statusMsg, setStatusMsg] = useState("");
+
+  const waitForTx = async (hash: `0x${string}`) => {
+    if (!publicClient) throw new Error("No public client");
+    return publicClient.waitForTransactionReceipt({ hash, timeout: 60_000, retryCount: 20 });
+  };
+
+  const doAdvance = async () => {
+    try {
+      const hash = await writeContractAsync({ address: addr as `0x${string}`, abi: LandBatchAbi, functionName: "advanceYear" });
+      setStatusMsg("Advancing — confirming...");
+      const receipt = await waitForTx(hash);
+      setStatusMsg(receipt.status === "success" ? "Year advanced." : "Failed on-chain.");
+    } catch (e: any) {
+      const msg = String(e?.message || "");
+      setStatusMsg(msg.includes("rejected") ? "You rejected the transaction." : (msg.length > 90 ? msg.slice(0, 90) + "..." : msg) || "Failed.");
+    }
+  };
+
+  const share = investorShareBps !== undefined ? (Number(investorShareBps) / 100).toFixed(1) + "%" : "—";
 
   return (
-    <section className="sketch overflow-hidden bg-white">
-      <div className="border-b-2 border-ink/20 px-5 py-4">
-        <h2 className="font-display text-3xl text-ink">Camera clips</h2>
-      </div>
-      <div className="p-5">
-        <div className="flex gap-2">
-          <input
-            type="url"
-            placeholder="https://… clip url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className="input-sketch"
-          />
-          <button
-            type="button"
-            className="btn btn-sun shrink-0"
-            disabled={!url || upload.isPending}
-            onClick={() =>
-              upload.writeContract({
-                address: batchAddress(id)!,
-                abi: landBatchAbi,
-                functionName: "uploadClip",
-                args: [url],
-              })
-            }
-          >
-            {upReceipt.isSuccess ? "Uploaded ✓" : upload.isPending ? "Uploading…" : "Upload clip"}
-          </button>
-        </div>
-        <div className="mt-3 space-y-1">
-          {d.clips.map((c, i) => (
-            <p key={i} className="truncate text-xs text-ink-3">📹 {c.url} · {dayToDate(c.timestamp)}</p>
-          ))}
-          {d.clips.length === 0 && <p className="text-xs text-ink-3">No clips yet.</p>}
-        </div>
-      </div>
-    </section>
+    <div className="flex flex-wrap items-center gap-3">
+      <button
+        onClick={doAdvance}
+        disabled={isPending}
+        className="sticker-btn sticker-btn-amber !px-5 !py-2.5 text-sm"
+      >
+        Advance 1 Year
+      </button>
+      <span className="text-sm font-semibold text-zinc-400">Crop {fmtInt(cropNumber)} · Year {fmtInt(currentYear)} · investor share {share}</span>
+      {statusMsg && <span className="text-xs font-semibold text-zinc-500 break-words">{statusMsg}</span>}
+    </div>
   );
 }
 
-function CreateBatchPanel() {
-  const [crop, setCrop] = useState("");
+function ClipsTab() {
+  return (
+    <div className="animate-pop-in space-y-4">
+      {allBatches().map((batch) => (
+        <BatchClips key={batch.id} batch={batch} />
+      ))}
+    </div>
+  );
+}
+
+function BatchClips({ batch }: { batch: LandBatch }) {
+  const addr = getBatchAddress(batch);
+  const { data: clips } = useReadContract({ address: addr, abi: LandBatchAbi, functionName: "getClips", query: { enabled: !!addr } });
+
+  const list = clips as readonly { url: string; timestamp: bigint }[] | undefined;
+
+  return (
+    <div className="sticker-card bg-white p-6">
+      <h3 className="mb-4 font-heading text-lg font-bold text-ink-900">{batch.cropType} — Daily Clips</h3>
+      {list && list.length > 0 ? (
+        <div className="space-y-2">
+          {list.map((c, i) => (
+            <div key={i} className="flex items-center justify-between rounded-xl border-2 border-ink-100 bg-ink-50 px-4 py-2.5 text-sm">
+              {isSafeUrl(c.url) ? (
+                <a href={c.url} target="_blank" rel="noreferrer" className="font-bold text-emerald-700 hover:underline break-all">
+                  {c.url}
+                </a>
+              ) : (
+                <span className="font-semibold text-zinc-500 break-all">{c.url}</span>
+              )}
+              <span className="ml-3 shrink-0 text-xs font-semibold text-zinc-600">day {String(c.timestamp / BigInt(86400))}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center text-sm font-semibold text-zinc-600">No clips uploaded yet. Use the Batches tab to upload.</div>
+      )}
+    </div>
+  );
+}
+
+function CreateBatchTab() {
+  const { address } = useSafeAccount();
+  const { writeContractAsync, isPending } = useWriteContract();
+  const publicClient = usePublicClient();
+  const [cropType, setCropType] = useState("");
   const [acres, setAcres] = useState("");
   const [price, setPrice] = useState("");
   const [supply, setSupply] = useState("");
-  const [fixed, setFixed] = useState("");
-  const [years, setYears] = useState("");
-  const create = useWriteContract();
-  const createReceipt = useWaitForTransactionReceipt({ hash: create.data });
+  const [fixedReturn, setFixedReturn] = useState("800");
+  const [cycleYears, setCycleYears] = useState("3");
+  const [farmerAddr, setFarmerAddr] = useState("");
+  const [statusMsg, setStatusMsg] = useState("");
 
-  const farmer = "0x0000000000000000000000000000000000000000";
+  const waitForTx = async (hash: `0x${string}`) => {
+    if (!publicClient) throw new Error("No public client");
+    return publicClient.waitForTransactionReceipt({ hash, timeout: 60_000, retryCount: 20 });
+  };
+
+  const handleCreate = async () => {
+    if (!publicClient) return;
+    const acresN = Number(acres);
+    const priceN = Number(price);
+    const supplyN = Number(supply);
+    if (!cropType.trim() || !acresN || acresN <= 0 || !priceN || priceN <= 0 || !supplyN || supplyN <= 0) {
+      setStatusMsg("Fill in crop type, acres, price and supply first.");
+      return;
+    }
+    const cycleYearsN = Number(cycleYears);
+    if (!cycleYearsN || cycleYearsN <= 0) {
+      setStatusMsg("Crop cycle years must be greater than 0.");
+      return;
+    }
+    const farmer = (farmerAddr.trim() as `0x${string}`) || (address as `0x${string}`);
+    try {
+      const hash = await writeContractAsync({
+        address: CONTRACT_ADDRESSES.factory as `0x${string}`,
+        abi: LandBatchFactoryAbi,
+        functionName: "createBatch",
+        args: [
+          farmer,
+          cropType.trim(),
+          BigInt(acresN),
+          BigInt(Math.round(priceN * 10 ** 18)),
+          BigInt(Math.round(supplyN * 10 ** 18)),
+          BigInt(fixedReturn || "800"),
+          BigInt(cycleYearsN),
+        ],
+      });
+      setStatusMsg("Deploying batch — confirming...");
+      const receipt = await waitForTx(hash);
+      if (receipt.status === "success") {
+        try {
+          const count = (await publicClient.readContract({
+            address: CONTRACT_ADDRESSES.factory as `0x${string}`,
+            abi: LandBatchFactoryAbi,
+            functionName: "getBatchCount",
+          })) as bigint;
+          const newAddr = (await publicClient.readContract({
+            address: CONTRACT_ADDRESSES.factory as `0x${string}`,
+            abi: LandBatchFactoryAbi,
+            functionName: "batches",
+            args: [count - BigInt(1)],
+          })) as `0x${string}`;
+          const created: LandBatch = {
+            id: Math.max(0, ...allBatches().map((b) => b.id)) + 1,
+            cropType: cropType.trim(),
+            acres: acresN,
+            pricePerToken: String(priceN),
+            totalSupply: String(supplyN),
+            tokensPerAcre: String(Math.round(supplyN / acresN)),
+            pricePerAcre: `$${Math.round(priceN * acresN).toLocaleString()}`,
+            totalValue: `$${Math.round(supplyN * priceN).toLocaleString()}`,
+            firstHarvest: "Year 1",
+            harvestCycle: "Annual",
+            cropCycleYears: cycleYearsN,
+            description: "User-created land batch deployed from Farm Ops.",
+            image: "/crops/unknown.jpg",
+            color: "from-emerald-500/20 to-green-500/20",
+            borderColor: "border-emerald-500/30",
+            address: newAddr,
+          };
+          saveCreatedBatch(created);
+          setStatusMsg(`Batch deployed! "${created.cropType}" added to the marketplace.`);
+        } catch (e2: any) {
+          console.error("REGISTER BATCH ERROR:", e2);
+          setStatusMsg("Batch deployed, but could not register it in the app. See console.");
+        }
+      } else {
+        setStatusMsg("Failed on-chain.");
+      }
+    } catch (e: any) {
+      const msg = String(e?.message || "");
+      if (msg.includes("Only admin")) setStatusMsg("Only the factory admin can create batches.");
+      else setStatusMsg(msg.includes("rejected") ? "You rejected the transaction." : (msg.length > 90 ? msg.slice(0, 90) + "..." : msg) || "Failed.");
+    }
+  };
 
   return (
-    <section className="sketch overflow-hidden bg-white">
-      <div className="border-b-2 border-ink/20 px-5 py-4">
-        <h2 className="font-display text-3xl text-ink">Create a batch</h2>
-      </div>
-      <div className="p-5">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <input type="text" placeholder="Crop type" value={crop} onChange={(e) => setCrop(e.target.value)} className="input-sketch" />
-          <input type="number" placeholder="Acres" value={acres} onChange={(e) => setAcres(e.target.value)} className="input-sketch" />
-          <input type="number" placeholder="Price per token (mUSDC)" value={price} onChange={(e) => setPrice(e.target.value)} className="input-sketch" />
-          <input type="number" placeholder="Total supply (tokens)" value={supply} onChange={(e) => setSupply(e.target.value)} className="input-sketch" />
-          <input type="number" placeholder="Fixed return % (e.g. 15)" value={fixed} onChange={(e) => setFixed(e.target.value)} className="input-sketch" />
-          <input type="number" placeholder="Crop cycle years" value={years} onChange={(e) => setYears(e.target.value)} className="input-sketch" />
+    <div className="animate-pop-in">
+      <div className="sticker-card bg-white p-6">
+        <h3 className="mb-4 font-heading text-lg font-bold text-ink-900">Create New Land Batch</h3>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              placeholder="Crop type"
+              value={cropType}
+              onChange={(e) => setCropType(e.target.value)}
+              className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+            />
+            <input
+              type="number"
+              placeholder="Total acres"
+              value={acres}
+              onChange={(e) => setAcres(e.target.value)}
+              className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="number"
+              placeholder="Token price (mUSDC)"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+            />
+            <input
+              type="number"
+              placeholder="Total supply"
+              value={supply}
+              onChange={(e) => setSupply(e.target.value)}
+              className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="number"
+              placeholder="Fixed return (bps, e.g. 800 = 8%)"
+              value={fixedReturn}
+              onChange={(e) => setFixedReturn(e.target.value)}
+              className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+            />
+            <input
+              type="number"
+              placeholder="Crop cycle years (replants at 70 / 30)"
+              value={cycleYears}
+              onChange={(e) => setCycleYears(e.target.value)}
+              className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+            />
+            <input
+              placeholder="Farmer address (defaults to you)"
+              value={farmerAddr}
+              onChange={(e) => setFarmerAddr(e.target.value)}
+              className="rounded-xl border-2 border-ink-800 bg-white px-4 py-2.5 text-sm font-semibold text-ink-900 placeholder-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600/20"
+            />
+          </div>
+          <button
+            onClick={handleCreate}
+            disabled={isPending}
+            className="sticker-btn sticker-btn-amber !px-5 !py-2.5 text-sm"
+          >
+            Deploy Batch
+          </button>
+          {statusMsg && <p className="text-xs font-semibold text-zinc-500 break-words">{statusMsg}</p>}
         </div>
-        <button
-          type="button"
-          className="btn btn-fill mt-4"
-          disabled={!crop || create.isPending}
-          onClick={() =>
-            create.writeContract({
-              address: CONTRACT_ADDRESSES.factory,
-              abi: factoryAbi,
-              functionName: "createBatch",
-              args: [
-                farmer,
-                crop,
-                BigInt(Number(acres) || 1),
-                BigInt(Math.round((Number(price) || 1) * 1e18)),
-                BigInt(Number(supply) || 10000),
-                BigInt(Math.round((Number(fixed) || 15) * 100)),
-                BigInt(Number(years) || 1),
-              ],
-            })
-          }
-        >
-          {createReceipt.isSuccess ? "Batch created ✓" : create.isPending ? "Creating…" : "Create batch"}
-        </button>
-        <p className="mt-2 text-xs text-ink-3">
-          {crop ? `New "${crop}" batch will be deployed by the factory.` : "Fill the form to deploy a new batch via LandBatchFactory."}
-        </p>
       </div>
-    </section>
+    </div>
   );
 }
