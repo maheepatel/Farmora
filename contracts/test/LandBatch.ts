@@ -41,22 +41,11 @@ describe("LandBatch", () => {
     return { batch, usdc, deployer, admin, farmer, investor1, investor2, supply, price };
   }
 
-  async function manyBuyers(batch: any, usdc: any, count: number, tokenAmount: bigint) {
-    const signers = await ethers.getSigners();
-    for (let i = 5; i < 5 + count; i++) {
-      const b = signers[i];
-      await usdc.mint(b.address, tokenAmount * 100n);
-      await usdc.connect(b).approve(await batch.getAddress(), ethers.MaxUint256);
-      await batch.connect(b).buyTokens(tokenAmount, false);
-    }
-  }
-
   describe("buy", () => {
-    it("buyer pays mUSDC and receives tokens; 10% goes to buybackReserve", async () => {
+    it("buyer pays mUSDC and receives tokens; full amount goes to buybackReserve", async () => {
       const { batch, usdc, investor1, price } = await loadFixture(deployFixture);
       const tokenAmount = 1000n * 10n ** 18n;
       const expectedUsdc = (tokenAmount * price) / 10n ** 18n;
-      const expectedReserve = (expectedUsdc * 10n) / 100n;
 
       const usdcBefore = await usdc.balanceOf(investor1.address);
       await batch.connect(investor1).buyTokens(tokenAmount, false);
@@ -64,7 +53,7 @@ describe("LandBatch", () => {
 
       expect(usdcBefore - usdcAfter).to.equal(expectedUsdc);
       expect(await batch.balanceOf(investor1.address)).to.equal(tokenAmount);
-      expect(await batch.buybackReserve()).to.equal(expectedReserve);
+      expect(await batch.buybackReserve()).to.equal(expectedUsdc);
       expect(await batch.soldTokens()).to.equal(tokenAmount);
     });
 
@@ -130,11 +119,10 @@ describe("LandBatch", () => {
     });
 
     it("after cooldown pays principal + 1%/yr and burns tokens", async () => {
-      const { batch, usdc, investor1, price } = await loadFixture(deployFixture);
+      const { batch, usdc, investor1, investor2, price } = await loadFixture(deployFixture);
       const tokenAmount = 1000n * 10n ** 18n;
       await batch.connect(investor1).buyTokens(tokenAmount, false);
-      // Need reserve (10% of all buys) >= payout (101% of this investor's principal)
-      await manyBuyers(batch, usdc, 10, tokenAmount);
+      await batch.connect(investor2).buyTokens(tokenAmount, false);
       const invested = (tokenAmount * price) / 10n ** 18n;
       const payoutExpected = invested + (invested * 1n) / 100n;
 
@@ -152,19 +140,68 @@ describe("LandBatch", () => {
       expect(await batch.totalSupply()).to.equal(40000n * 10n ** 18n - tokenAmount);
     });
 
-    it("insufficient buyback reserve reverts", async () => {
-      const { batch, usdc, investor1 } = await loadFixture(deployFixture);
+    it("partial sell pays only the proportional principal (anti-drain)", async () => {
+      const { batch, usdc, investor1, investor2, price } = await loadFixture(deployFixture);
       const tokenAmount = 1000n * 10n ** 18n;
       await batch.connect(investor1).buyTokens(tokenAmount, false);
-      // Reserve = 10% of 11 buyers' principal = 1100; this seller needs 1010 -> OK.
-      await manyBuyers(batch, usdc, 9, tokenAmount); // reserve now 10 * 100 = 1000
+      await batch.connect(investor2).buyTokens(tokenAmount, false);
+      const invested = (tokenAmount * price) / 10n ** 18n;
+
+      // Sell 25% of tokens -> must only receive 25% of invested + 1%/yr on that 25%
+      const sellAmount = tokenAmount / 4n;
+      await batch.connect(investor1).requestSell(sellAmount);
+      await time.increase(SELL_COOLDOWN + 1n);
+
+      const principalExpected = (invested * 1n) / 4n;
+      const payoutExpected = principalExpected + (principalExpected * 1n) / 100n;
+
+      const before = await usdc.balanceOf(investor1.address);
+      await expect(batch.connect(investor1).executeSell()).to.emit(batch, "SellExecuted").withArgs(
+        investor1.address,
+        payoutExpected
+      );
+      const payout = (await usdc.balanceOf(investor1.address)) - before;
+      expect(payout).to.equal(payoutExpected);
+
+      // Remaining stake is 75% of tokens AND 75% of invested
+      expect(await batch.balanceOf(investor1.address)).to.equal(sellAmount * 3n);
+      const info = await batch.getInvestorInfo(investor1.address);
+      expect(info.totalInvested).to.equal((invested * 3n) / 4n);
+    });
+
+    it("full reserve means a single investor can always exit (no 9% brick)", async () => {
+      const { batch, usdc, investor1, investor2, price } = await loadFixture(deployFixture);
+      const tokenAmount = 1000n * 10n ** 18n;
+      await batch.connect(investor1).buyTokens(tokenAmount, false);
+      await batch.connect(investor2).buyTokens(tokenAmount, false);
+      const invested = (tokenAmount * price) / 10n ** 18n;
+      const payoutExpected = invested + (invested * 1n) / 100n;
+
       await batch.connect(investor1).requestSell(tokenAmount);
       await time.increase(SELL_COOLDOWN + 1n);
 
-      // reserve 1000 < payout 1010 -> revert
-      await expect(batch.connect(investor1).executeSell()).to.be.revertedWith(
-        "Insufficient buyback reserve"
-      );
+      const before = await usdc.balanceOf(investor1.address);
+      await batch.connect(investor1).executeSell();
+      const payout = (await usdc.balanceOf(investor1.address)) - before;
+      expect(payout).to.equal(payoutExpected);
+    });
+
+    it("milestone cannot drain below the buyback reserve", async () => {
+      const { batch, usdc, admin, farmer } = await loadFixture(deployFixture);
+      const tokenAmount = 1000n * 10n ** 18n;
+      await batch.connect(admin).buyTokens(tokenAmount, false);
+      // All funds are now reserved for buybacks; a milestone cannot be claimed
+      await batch.connect(admin).createMilestone("Planting complete", 1n * 10n ** 18n, 0n, 30n);
+      await expect(batch.connect(admin).claimMilestone(0)).to.be.revertedWith("Insufficient funds");
+
+      // After distributing revenue, surplus becomes claimable
+      const rev = 500n * 10n ** 18n;
+      await usdc.connect(admin).approve(await batch.getAddress(), rev);
+      await batch.connect(admin).distributeRevenue(rev);
+      const farmerBefore = await usdc.balanceOf(farmer.address);
+      await expect(batch.connect(admin).claimMilestone(0)).to.emit(batch, "MilestoneClaimed");
+      const farmerAfter = await usdc.balanceOf(farmer.address);
+      expect(farmerAfter - farmerBefore).to.equal(1n * 10n ** 18n);
     });
   });
 

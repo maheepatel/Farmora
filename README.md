@@ -201,8 +201,6 @@ farmora/
 ├── contracts/
 │   └── deployed.json          the source of truth for contract addresses
 ├── frontend/
-│   ├── contracts/
-│   │   └── deployed.json      auto-copied from above, don't edit this one
 │   ├── scripts/
 │   │   └── sync-contracts.mjs the copier, runs on predev and prebuild
 │   ├── src/
@@ -218,6 +216,7 @@ farmora/
 │   │   └── lib/
 │   │       ├── abi/           contract ABIs, 4 JSON files
 │   │       ├── config.ts      chain config, economics, the 8 parcels
+│   │       ├── deployed.json  auto-copied from contracts/deployed.json, don't edit this one
 │   │       ├── wagmi.ts       wallet connection
 │   │       ├── live.ts        the 30s live-read layer
 │   │       ├── tx.ts          transaction helpers
@@ -249,23 +248,23 @@ Monad Testnet, chain ID 10143. Explorer at
 
 | Contract | Address |
 |---|---|
-| MockUSDC | `0x...` |
-| LandBatchFactory | `0x...` |
-| StayBooking | `0x...` |
+| MockUSDC | `0x32d31E354C777775DA3090A80427f4CAD5F5bef8` |
+| LandBatchFactory | `0x455dcBc5fafE62295CbA867eEc31491244fFA6a6` |
+| StayBooking | `0x7176d465483Fc6a2A571D9389C4ffee84BA3B446` |
 
 <details>
 <summary>Parcel addresses</summary>
 
 | # | Crop | Address |
 |---|---|---|
-| 0 | Saffron | `0x...` |
-| 1 | Cordyceps | `0x...` |
-| 2 | Mushroom | `0x...` |
-| 3 | Dragon Fruit | `0x...` |
-| 4 | Pomegranate | `0x...` |
-| 5 | Grapes | `0x...` |
-| 6 | Turmeric | `0x...` |
-| 7 | Ginger | `0x...` |
+| 0 | Saffron | `0x3D5008f631E3276EB8F79869808e24001Ac35a6A` |
+| 1 | Cordyceps | `0x450CA1d0eB6849A939f5506b108596E62F01779C` |
+| 2 | Mushroom | `0x4F95b8e426af49f75e16486fE0e4936Af096A01E` |
+| 3 | Dragon Fruit | `0x19E9518EC7a8CE09E4e205B2Fd4C58b0A221F46D` |
+| 4 | Pomegranate | `0x820b3e38137695c54D453e2a54108C597585EBC2` |
+| 5 | Grapes | `0x8fF38de96E55F57928e52B831100836B6A017382` |
+| 6 | Turmeric | `0x39226Bcdfc7DebB1E8627F3A5c8D3a0a668AA37c` |
+| 7 | Ginger | `0x80F955164203a59b1fd036a2FC46Eef6a444ED31` |
 
 </details>
 
@@ -277,11 +276,11 @@ Edit `contracts/deployed.json` at the repo root. That one file, nothing else:
 {
   "chainId": 10143,
   "chainName": "Monad Testnet",
-  "mockUSDC": "0x...",
-  "factory": "0x...",
-  "stayBooking": "0x...",
-  "batches": ["0x...", "0x...", "0x...", "0x...", "0x...", "0x...", "0x...", "0x..."],
-  "stayPrices": [250, 300, 150, 400, 500, 450, 200, 200]
+  "mockUSDC": "0x32d31E354C777775DA3090A80427f4CAD5F5bef8",
+  "factory": "0x455dcBc5fafE62295CbA867eEc31491244fFA6a6",
+  "stayBooking": "0x7176d465483Fc6a2A571D9389C4ffee84BA3B446",
+  "batches": ["0x3D5008f631E3276EB8F79869808e24001Ac35a6A", "0x450CA1d0eB6849A939f5506b108596E62F01779C", "0x4F95b8e426af49f75e16486fE0e4936Af096A01E", "0x19E9518EC7a8CE09E4e205B2Fd4C58b0A221F46D", "0x820b3e38137695c54D453e2a54108C597585EBC2", "0x8fF38de96E55F57928e52B831100836B6A017382", "0x39226Bcdfc7DebB1E8627F3A5c8D3a0a668AA37c", "0x80F955164203a59b1fd036a2FC46Eef6a444ED31"],
+  "stayPrices": [350, 300, 180, 300, 250, 320, 150, 150]
 }
 ```
 
@@ -406,15 +405,17 @@ Built for [Monad Blitz Bangalore V5](https://blitz.devnads.com/events/monad-blit
 - Monad Testnet wired end to end with four-provider RPC failover
 - Contract ABIs and the typed integration layer around them
 - Graceful "not deployed" states so a missing address never blanks the app
+- Contracts deployed and verified on Monad Testnet (chain 10143), see
+  [Deployed contracts](#deployed-contracts)
+- 8 security findings patched and re-verified, see `SECURITY-AUDIT.md`
 
 **In progress**
 
-- Solidity sources go in `contracts/`, deployment to Monad Testnet still pending
 - The Time Machine, replaying a decade of farm economics as live transactions
 
 **Not built yet**
 
-- Automated contract tests and an end to end suite
+- An automated end to end suite
 - Real IPFS pinning for clips, currently it takes a URL
 - Legal title and land registry. This is a testnet demo with a mock stablecoin, not a
   securities offering.

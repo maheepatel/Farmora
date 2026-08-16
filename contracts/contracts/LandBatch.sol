@@ -3,9 +3,10 @@ pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./MockUSDC.sol";
 
-contract LandBatch is ERC20 {
+contract LandBatch is ERC20, ReentrancyGuard {
     MockUSDC public usdc;
 
     address public farmer;
@@ -20,6 +21,7 @@ contract LandBatch is ERC20 {
     uint256 public buybackReserve;
     uint256 public fixedReturnBps;
     uint256 public totalRevenueDistributed;
+    uint256 public totalInvestedSum;
 
     enum GrowthStage { Seedling, Vegetative, Flowering, Fruiting, HarvestReady }
     GrowthStage public growthStage;
@@ -29,7 +31,6 @@ contract LandBatch is ERC20 {
 
     uint256 public constant SHARE_DECREASE_PER_YEAR = 500;
     uint256 public constant INITIAL_INVESTOR_SHARE = 7000;
-    uint256 public constant BUYBACK_RESERVE_PCT = 10;
     uint256 public constant APPRECIATION_PCT_PER_YEAR = 100;
     uint256 public constant SELL_COOLDOWN = 90 days;
     uint256 public constant BPS_DENOM = 10000;
@@ -37,6 +38,7 @@ contract LandBatch is ERC20 {
     struct InvestorInfo {
         bool isFixedReturn;
         uint256 totalInvested;
+        uint256 tokenAmount;
         uint256 claimedRevenue;
         uint256 pendingRevenue;
     }
@@ -129,8 +131,7 @@ contract LandBatch is ERC20 {
         uint256 usdcAmount = (tokenAmount * pricePerToken) / 1e18;
         require(usdc.transferFrom(msg.sender, address(this), usdcAmount), "USDC transfer failed");
 
-        uint256 reserveAmount = (usdcAmount * BUYBACK_RESERVE_PCT) / 100;
-        buybackReserve += reserveAmount;
+        buybackReserve += usdcAmount;
 
         _transfer(address(this), msg.sender, tokenAmount);
         soldTokens += tokenAmount;
@@ -140,8 +141,12 @@ contract LandBatch is ERC20 {
             investorList.push(msg.sender);
         }
 
-        investors[msg.sender].isFixedReturn = isFixedReturn;
+        investors[msg.sender].tokenAmount += tokenAmount;
+        if (investors[msg.sender].totalInvested == 0) {
+            investors[msg.sender].isFixedReturn = isFixedReturn;
+        }
         investors[msg.sender].totalInvested += usdcAmount;
+        totalInvestedSum += usdcAmount;
 
         emit TokensPurchased(msg.sender, tokenAmount, usdcAmount, isFixedReturn);
     }
@@ -163,36 +168,44 @@ contract LandBatch is ERC20 {
         emit SellRequested(msg.sender, tokenAmount);
     }
 
-    function executeSell() external {
+    function executeSell() external nonReentrant {
         SellRequest storage req = sellRequests[msg.sender];
         require(req.active, "No active sell request");
         require(block.timestamp >= req.requestTime + SELL_COOLDOWN, "Cooldown not passed");
 
         uint256 yearsHeld = (block.timestamp - plantingDate) / 365 days;
         if (yearsHeld == 0) yearsHeld = 1;
+        if (yearsHeld > cropCycleYears) yearsHeld = cropCycleYears;
 
         uint256 invested = investors[msg.sender].totalInvested;
-        uint256 appreciationAmount = (invested * yearsHeld * APPRECIATION_PCT_PER_YEAR) / BPS_DENOM;
-        uint256 totalReturn = invested + appreciationAmount;
+        uint256 owned = investors[msg.sender].tokenAmount;
+        require(owned > 0 && req.tokenAmount <= owned, "Invalid sell amount");
+
+        uint256 principalToReturn = (invested * req.tokenAmount) / owned;
+        uint256 appreciationAmount = (principalToReturn * yearsHeld * APPRECIATION_PCT_PER_YEAR) / BPS_DENOM;
+        uint256 totalReturn = principalToReturn + appreciationAmount;
 
         require(buybackReserve >= totalReturn, "Insufficient buyback reserve");
+        require(usdc.balanceOf(address(this)) >= totalReturn, "Insufficient contract balance");
 
-        buybackReserve -= totalReturn;
+        buybackReserve -= principalToReturn;
         req.active = false;
         soldTokens -= req.tokenAmount;
         lockedTokens -= req.tokenAmount;
 
         _burn(address(this), req.tokenAmount);
 
-        investors[msg.sender].totalInvested = 0;
-        investors[msg.sender].pendingRevenue = 0;
+        investors[msg.sender].totalInvested = invested - principalToReturn;
+        investors[msg.sender].tokenAmount = owned - req.tokenAmount;
+        investors[msg.sender].pendingRevenue = (investors[msg.sender].pendingRevenue * (owned - req.tokenAmount)) / owned;
+        totalInvestedSum -= principalToReturn;
 
         require(usdc.transfer(msg.sender, totalReturn), "USDC transfer failed");
 
         emit SellExecuted(msg.sender, totalReturn);
     }
 
-    function distributeRevenue(uint256 totalRevenue) external onlyFarmerOrAdmin {
+    function distributeRevenue(uint256 totalRevenue) external onlyFarmerOrAdmin nonReentrant {
         require(totalRevenue > 0, "Revenue must be > 0");
         require(usdc.transferFrom(msg.sender, address(this), totalRevenue), "USDC transfer failed");
 
@@ -201,16 +214,11 @@ contract LandBatch is ERC20 {
         uint256 investorPool = (totalRevenue * investorShareBps) / BPS_DENOM;
         uint256 farmerShare = totalRevenue - investorPool;
 
-        uint256 totalInvested = 0;
-        for (uint256 i = 0; i < investorList.length; i++) {
-            totalInvested += investors[investorList[i]].totalInvested;
-        }
-
-        if (totalInvested > 0) {
+        if (totalInvestedSum > 0) {
             for (uint256 i = 0; i < investorList.length; i++) {
                 address inv = investorList[i];
                 if (investors[inv].totalInvested > 0) {
-                    uint256 share = (investorPool * investors[inv].totalInvested) / totalInvested;
+                    uint256 share = (investorPool * investors[inv].totalInvested) / totalInvestedSum;
                     investors[inv].pendingRevenue += share;
 
                     if (investors[inv].isFixedReturn) {
@@ -234,9 +242,11 @@ contract LandBatch is ERC20 {
         emit RevenueDistributed(totalRevenue);
     }
 
-    function claimRevenue() external {
+    function claimRevenue() external nonReentrant {
         uint256 amount = investors[msg.sender].pendingRevenue;
         require(amount > 0, "No pending revenue");
+
+        require(usdc.balanceOf(address(this)) >= buybackReserve + amount, "Insufficient funds");
 
         investors[msg.sender].pendingRevenue = 0;
         investors[msg.sender].claimedRevenue += amount;
@@ -289,7 +299,7 @@ contract LandBatch is ERC20 {
         emit MilestoneCreated(milestones.length - 1, _name, _amount);
     }
 
-    function claimMilestone(uint256 index) external onlyFarmerOrAdmin {
+    function claimMilestone(uint256 index) external onlyFarmerOrAdmin nonReentrant {
         require(index < milestones.length, "Invalid milestone");
         Milestone storage m = milestones[index];
         require(!m.claimed, "Already claimed");
@@ -297,6 +307,8 @@ contract LandBatch is ERC20 {
         uint256 daysSincePlanting = (block.timestamp - plantingDate) / 1 days;
         require(daysSincePlanting >= m.startDay, "Too early");
         require(daysSincePlanting <= m.endDay || m.endDay == 0, "Too late");
+
+        require(usdc.balanceOf(address(this)) >= buybackReserve + m.amount, "Insufficient funds");
 
         m.claimed = true;
         require(usdc.transfer(farmer, m.amount), "USDC transfer failed");
