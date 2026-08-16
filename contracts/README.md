@@ -82,7 +82,7 @@ Both scripts write/update `contracts/deployed.json` — the machine-readable dep
 | Batch 6 · Turmeric | `0x97acc0E247A646096e1bD7C7030642b656b46297` | [view](https://testnet.monadscan.com/address/0x97acc0E247A646096e1bD7C7030642b656b46297) |
 | Batch 7 · Ginger | `0x47e6560cEf1Aecf8765373E0f878D82AF7bdB364` | [view](https://testnet.monadscan.com/address/0x47e6560cEf1Aecf8765373E0f878D82AF7bdB364) |
 
-All confirmed deployed with `eth_getCode` (bytecode present) and visible on [testnet.monadscan.com](https://testnet.monadscan.com).
+All confirmed deployed with `eth_getCode` (bytecode present) and visible on [testnet.monadscan.com](https://testnet.monadscan.com). All source-verified on MonadVision (Sourcify) — view the code at `https://testnet.monadvision.com/contracts/full_match/10143/<address>`. (Monadscan verification requires an Etherscan V2 API key; the deprecated V1 endpoint is no longer accepted.)
 
 ## Security notes
 

@@ -42,7 +42,7 @@ Deployed on Monad Testnet (chain 10143) — see `contracts/deployed.json` for th
 | Batch 6 · Turmeric | `0x97acc0E247A646096e1bD7C7030642b656b46297` | [view](https://testnet.monadscan.com/address/0x97acc0E247A646096e1bD7C7030642b656b46297) |
 | Batch 7 · Ginger | `0x47e6560cEf1Aecf8765373E0f878D82AF7bdB364` | [view](https://testnet.monadscan.com/address/0x47e6560cEf1Aecf8765373E0f878D82AF7bdB364) |
 
-All verified live with `eth_getCode` and visible on [testnet.monadscan.com](https://testnet.monadscan.com).
+All verified live with `eth_getCode` and visible on [testnet.monadscan.com](https://testnet.monadscan.com). All source-verified on MonadVision (Sourcify): `https://testnet.monadvision.com/contracts/full_match/10143/<address>`.
 
 ### Seed batches
 

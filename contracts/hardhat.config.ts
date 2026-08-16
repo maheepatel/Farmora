@@ -7,7 +7,10 @@ dotenvConfig();
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.27",
-    settings: { optimizer: { enabled: true, runs: 200 } },
+    settings: {
+      optimizer: { enabled: true, runs: 200 },
+      metadata: { bytecodeHash: "ipfs" },
+    },
   },
   networks: {
     monadTestnet: {
@@ -19,6 +22,26 @@ const config: HardhatUserConfig = {
       url: "http://127.0.0.1:8545",
       chainId: 10143,
     },
+  },
+  etherscan: {
+    apiKey: {
+      monadTestnet: process.env.ETHERSCAN_API_KEY || "verify",
+    },
+    customChains: [
+      {
+        network: "monadTestnet",
+        chainId: 10143,
+        urls: {
+          apiURL: "https://api-testnet.monadscan.com/api",
+          browserURL: "https://testnet.monadscan.com",
+        },
+      },
+    ],
+  },
+  sourcify: {
+    enabled: true,
+    apiUrl: "https://sourcify-api-monad.blockvision.org/",
+    browserUrl: "https://testnet.monadvision.com",
   },
 };
 
