@@ -91,6 +91,57 @@ describe("StayBooking", () => {
     expect(bookings.length).to.equal(0);
   });
 
+  it("cannot cancel on or after check-in day (anti-griefing)", async () => {
+    const { booking, guest1 } = await loadFixture(deployFixture);
+    const today = BigInt(Math.floor(Date.now() / 1000 / 86400));
+    await booking.connect(guest1).bookStay(0, today, 1, 1);
+    await expect(booking.connect(guest1).cancelStay(0, today)).to.be.revertedWith(
+      "Too late to cancel"
+    );
+  });
+
+  it("owner withdraw only from free balance (refunds protected)", async () => {
+    const { booking, usdc, owner, guest1 } = await loadFixture(deployFixture);
+    const day = futureDay();
+    await booking.connect(guest1).bookStay(0, day, 2, 2); // 700 locked for refund
+
+    // Cannot withdraw the 700 that is refundable
+    await expect(booking.withdraw(ethers.parseUnits("700", 18))).to.be.revertedWith(
+      "Insufficient free balance"
+    );
+
+    // Fund surplus and withdraw it
+    await usdc.connect(owner).transfer(await booking.getAddress(), ethers.parseUnits("300", 18));
+    const before = await usdc.balanceOf(owner.address);
+    await expect(booking.withdraw(ethers.parseUnits("300", 18))).to.emit(booking, "Withdrawn");
+    expect((await usdc.balanceOf(owner.address)) - before).to.equal(ethers.parseUnits("300", 18));
+
+    // Guest can still cancel and get the full refund
+    const guestBefore = await usdc.balanceOf(guest1.address);
+    await booking.connect(guest1).cancelStay(0, day);
+    expect((await usdc.balanceOf(guest1.address)) - guestBefore).to.equal(ethers.parseUnits("700", 18));
+  });
+
+  it("non-owner cannot withdraw", async () => {
+    const { booking, guest1 } = await loadFixture(deployFixture);
+    await expect(booking.connect(guest1).withdraw(1n)).to.be.reverted;
+  });
+
+  it("settleStay releases refund reserve after the stay passes", async () => {
+    const { booking, usdc, owner, guest1 } = await loadFixture(deployFixture);
+    const day = futureDay();
+    await booking.connect(guest1).bookStay(0, day, 1, 1); // 350 refundable
+
+    // Free balance is 0 while the stay is unsettled
+    await expect(booking.withdraw(1n)).to.be.revertedWith("Insufficient free balance");
+
+    // Fast-forward past check-in day, then settle
+    await time.increase(SECONDS_PER_DAY * (10n + 2n));
+    await booking.connect(owner).settleStay(0, day);
+    await expect(booking.connect(owner).withdraw(ethers.parseUnits("350", 18))).to.emit(booking, "Withdrawn");
+    void usdc;
+  });
+
   it("non-booker cannot cancel", async () => {
     const { booking, guest1, guest2 } = await loadFixture(deployFixture);
     const day = futureDay();

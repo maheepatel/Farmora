@@ -38,6 +38,15 @@ describe("MockUSDC", () => {
     expect(await usdc.balanceOf(other.address)).to.equal(123n * 10n ** 18n);
   });
 
+  it("non-owner cannot mint (previously permissionless)", async () => {
+    const { usdc, owner, other } = await loadFixture(deployFixture);
+    await expect(usdc.connect(other).mint(other.address, 1n)).to.be.reverted;
+    // owner still can
+    await usdc.mint(other.address, 1n);
+    expect(await usdc.balanceOf(other.address)).to.equal(1n);
+    void owner;
+  });
+
   it("has correct name/symbol/decimals", async () => {
     const { usdc } = await loadFixture(deployFixture);
     expect(await usdc.name()).to.equal("MockUSDC");
