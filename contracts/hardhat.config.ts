@@ -24,19 +24,7 @@ const config: HardhatUserConfig = {
     },
   },
   etherscan: {
-    apiKey: {
-      monadTestnet: process.env.ETHERSCAN_API_KEY || "verify",
-    },
-    customChains: [
-      {
-        network: "monadTestnet",
-        chainId: 10143,
-        urls: {
-          apiURL: "https://api-testnet.monadscan.com/api",
-          browserURL: "https://testnet.monadscan.com",
-        },
-      },
-    ],
+    enabled: false,
   },
   sourcify: {
     enabled: true,
