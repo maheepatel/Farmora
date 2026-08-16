@@ -58,6 +58,7 @@ export type BatchLive = {
 export type InvestorInfo = {
   isFixedReturn: boolean;
   totalInvested: bigint;
+  tokenAmount: bigint;
   claimedRevenue: bigint;
   pendingRevenue: bigint;
 };
@@ -194,13 +195,15 @@ export function useInvestorInfo(
   });
 
   const parsed = useMemo<InvestorInfo>(() => {
-    if (!data) return { isFixedReturn: false, totalInvested: 0n, claimedRevenue: 0n, pendingRevenue: 0n };
-    const t = data as unknown as [boolean, bigint, bigint, bigint];
+    if (!data)
+      return { isFixedReturn: false, totalInvested: 0n, tokenAmount: 0n, claimedRevenue: 0n, pendingRevenue: 0n };
+    const t = data as unknown as [boolean, bigint, bigint, bigint, bigint];
     return {
       isFixedReturn: t[0],
       totalInvested: t[1],
-      claimedRevenue: t[2],
-      pendingRevenue: t[3],
+      tokenAmount: t[2],
+      claimedRevenue: t[3],
+      pendingRevenue: t[4],
     };
   }, [data]);
 

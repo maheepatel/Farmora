@@ -8,6 +8,7 @@ import { getBatchMeta } from "@/lib/config";
 import { batchAddress, useBatch, useStayPrice } from "@/lib/contracts";
 import { fmtUSDC, fmtWhole, pct, GROWTH_STAGES, timeAgo } from "@/lib/format";
 import { estimateReturns } from "@/lib/estimator";
+import { cropVideo } from "@/lib/images";
 
 export function BatchDetail({ id }: { id: number }) {
   const meta = getBatchMeta(id);
@@ -52,6 +53,23 @@ export function BatchDetail({ id }: { id: number }) {
         </span>
       </div>
       <p className="mt-3 max-w-2xl text-ink-2">{meta.description}</p>
+
+      {(() => {
+        const video = cropVideo(meta.cropType);
+        return video ? (
+          <div className="sketch mt-6 overflow-hidden p-0">
+            <video
+              src={video}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              className="aspect-video w-full object-cover"
+            />
+          </div>
+        ) : null;
+      })()}
 
       <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-6">
         {[

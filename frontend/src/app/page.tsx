@@ -10,7 +10,7 @@ import { Arrow } from "@/components/doodles";
 import { ParcelsTable } from "@/components/parcels-table";
 import { BATCH_ADDRESSES, CONTRACT_ADDRESSES } from "@/lib/config";
 import { useBatch } from "@/lib/contracts";
-import { IMG } from "@/lib/images";
+import { IMG, VIDEO } from "@/lib/images";
 
 const model = [
   {
@@ -104,13 +104,15 @@ export default function Home() {
 
           <div className="relative">
             <div className="sketch tilt-r overflow-hidden p-0">
-              <Image
-                src={IMG.hero}
-                alt="Farmora farmland"
-                width={1600}
-                height={900}
+              <video
+                src={VIDEO.hero}
+                poster={IMG.hero}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
                 className="aspect-video w-full object-cover"
-                priority
               />
               <span className="chip absolute right-4 top-4 rotate-3 bg-harvest text-ink">
                 your slice of it

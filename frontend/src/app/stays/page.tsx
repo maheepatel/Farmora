@@ -1,12 +1,14 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { waitForTransactionReceipt } from "@wagmi/core/actions";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState } from "react";
-import { useAccount, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { BATCHES, CONTRACT_ADDRESSES, getBatchMeta } from "@/lib/config";
-import { stayAbi, useGetStay, useIsBooked, useStayPrice, useUserBookings } from "@/lib/contracts";
+import { stayAbi, usdcAbi, useGetStay, useIsBooked, useStayPrice, useUserBookings } from "@/lib/contracts";
 import { dateToDay, dayToDate, fmtUSDC } from "@/lib/format";
+import { wagmiConfig } from "@/lib/wagmi";
 
 export default function StaysPage() {
   const { address, isConnected } = useAccount();
@@ -14,20 +16,55 @@ export default function StaysPage() {
   const [date, setDate] = useState("");
   const [nights, setNights] = useState("2");
   const [guests, setGuests] = useState("2");
+  const [approving, setApproving] = useState(false);
 
   const day = useMemo(() => (date ? dateToDay(date) : undefined), [date]);
   const price = useStayPrice(sel);
   const booked = useIsBooked(sel, day);
   const stay = useGetStay(sel, day);
 
+  const { data: allowance } = useReadContract({
+    address: CONTRACT_ADDRESSES.mockUSDC,
+    abi: usdcAbi,
+    functionName: "allowance",
+    args: address ? [address, CONTRACT_ADDRESSES.stayBooking] : undefined,
+    query: { enabled: !!address, refetchInterval: 10_000 },
+  });
+
   const book = useWriteContract();
   const bookReceipt = useWaitForTransactionReceipt({ hash: book.data });
+  const approve = useWriteContract();
   const cancel = useWriteContract();
   const cancelReceipt = useWaitForTransactionReceipt({ hash: cancel.data });
 
   const nightsN = useMemo(() => Math.max(1, Math.min(7, Number(nights) || 1)), [nights]);
   const guestsN = useMemo(() => Math.max(1, Math.min(8, Number(guests) || 1)), [guests]);
   const total = price !== undefined ? price * BigInt(nightsN) : 0n;
+  const needsApproval = ((allowance as bigint) ?? 0n) < total;
+
+  const handleBook = async () => {
+    if (total <= 0n || !isConnected) return;
+    try {
+      if (needsApproval) {
+        setApproving(true);
+        const approveHash = await approve.writeContractAsync({
+          address: CONTRACT_ADDRESSES.mockUSDC,
+          abi: usdcAbi,
+          functionName: "approve",
+          args: [CONTRACT_ADDRESSES.stayBooking, total],
+        });
+        await waitForTransactionReceipt(wagmiConfig, { hash: approveHash });
+      }
+      await book.writeContractAsync({
+        address: CONTRACT_ADDRESSES.stayBooking,
+        abi: stayAbi,
+        functionName: "bookStay",
+        args: [BigInt(sel), day!, BigInt(nightsN), BigInt(guestsN)],
+      });
+    } catch {
+      setApproving(false);
+    }
+  };
 
   const myBookings = useUserBookings(address);
   const checked = day !== undefined;
@@ -165,17 +202,16 @@ export default function StaysPage() {
                           <button
                             type="button"
                             className="btn btn-fill"
-                            disabled={book.isPending}
-                            onClick={() =>
-                              book.writeContract({
-                                address: CONTRACT_ADDRESSES.stayBooking,
-                                abi: stayAbi,
-                                functionName: "bookStay",
-                                args: [BigInt(sel), day!, BigInt(nightsN), BigInt(guestsN)],
-                              })
-                            }
+                            disabled={book.isPending || approving}
+                            onClick={handleBook}
                           >
-                            {book.isPending ? "Booking…" : `Confirm booking · ${fmtUSDC(total)} mUSDC`}
+                            {book.isPending || approving
+                              ? approving
+                                ? "Approving…"
+                                : "Booking…"
+                              : needsApproval
+                                ? `Approve & book · ${fmtUSDC(total)} mUSDC`
+                                : `Confirm booking · ${fmtUSDC(total)} mUSDC`}
                           </button>
                           <button type="button" className="btn btn-sketch" onClick={() => setDate("")}>
                             Pick another date
