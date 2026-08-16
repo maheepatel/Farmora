@@ -1,13 +1,13 @@
-# Farmora (AcreLedger)
+# 🌾 Farmora
 
-> **Real farmland, fractionalised on-chain.** Buy tokens in a crop parcel, earn a share
-> of every harvest, and watch the farmer's share grow year after year — every number on
-> screen read live from contract storage, never a database.
+Tokenized farmland on Monad. Buy tokens in a crop parcel, earn a cut of every harvest,
+and watch the farmer's share climb year after year. Every figure in the app is read live
+from contract storage.
 
 **Monad Testnet (chain 10143)** · Next.js 16 · Solidity · wagmi + viem + RainbowKit
 
 <!-- Add these once you have them:
-[**Live demo →**](https://your-app.vercel.app)  ·  [**Demo video →**](https://...)
+[Live demo](https://your-app.vercel.app) · [Demo video](https://...)
 -->
 
 ---
@@ -16,12 +16,15 @@
 
 - [What this is](#what-this-is)
 - [How the money works](#how-the-money-works)
-- [Run the frontend](#run-the-frontend)
-- [Run the contracts](#run-the-contracts)
+- [Run it in 3 minutes](#run-it-in-3-minutes)
 - [Set up your wallet](#set-up-your-wallet)
+- [Take the tour](#take-the-tour)
 - [Project layout](#project-layout)
 - [Deployed contracts](#deployed-contracts)
+- [Configuration](#configuration)
+- [All commands](#all-commands)
 - [Deploying](#deploying)
+- [Troubleshooting](#troubleshooting)
 - [Project status](#project-status)
 - [Team](#team)
 
@@ -29,110 +32,125 @@
 
 ## What this is
 
-Farmland is one of the oldest, steadiest asset classes on earth, and almost nobody can
-buy any. Minimums run into six figures, ownership records sit in filing cabinets, and if
-you want out you have to find someone to buy an entire farm.
+Farmland has been a solid asset class for about as long as there have been assets, but
+almost nobody gets to own any of it. Minimums run into six figures. Ownership records sit
+in filing cabinets. If you want out, you have to find a buyer for an entire farm.
 
-Farmora breaks a working farm into eight crop parcels and turns each one into an ERC-20
-token. You buy `L-Saffron` or `L-Grapes` with a test stablecoin, and from then on:
+Farmora splits a working farm into eight crop parcels and turns each one into an ERC-20
+token. You buy `L-Saffron` or `L-Grapes` with a test stablecoin, and after that:
 
-- **Every harvest splits automatically.** The contract pays revenue out pro-rata to token
-  holders — you claim it to your wallet whenever you like.
-- **The farmer's share grows.** Investors start at 70% of harvest revenue and step down
-  5 points a year. The farmer is buying back their own land with the crop, not with cash.
-- **The farm has to prove it exists.** The farmer posts timestamped daily clips on-chain
-  and can only draw operating budget inside time windows tied to the crop's growth stage.
-- **You can go stand on it.** Each parcel has a farmhouse you can book for a weekend,
-  paid in the same token. Double bookings revert on-chain.
+- Harvest revenue splits automatically. The contract pays token holders pro-rata and you
+  claim yours to your wallet whenever you want.
+- The farmer's share grows over time. Investors start at 70% of harvest revenue and step
+  down 5 points a year, so the farm gets paid back in crops rather than cash.
+- The farm has to show its work. The farmer posts timestamped daily clips on-chain, and
+  operating budget can only be drawn inside time windows tied to the crop's growth stage.
+- There's a farmhouse on every parcel that you can book for a weekend, paid in the same
+  token. The contract rejects double bookings.
+
+No backend, no database. Everything the app displays comes out of contract storage. Your
+wallet is your login.
 
 ### Why Monad
 
-Farm economics play out over a decade, which makes them impossible to demo. Monad's
-~400 ms blocks let us replay that decade live: the **Time Machine** fires hundreds of real
-transactions — harvests, revenue distributions, the investor share sliding 70 → 65 → 60
-→ … → 0 — while you watch the ladder tick down. Revenue distribution to every investor in
-a parcel lands in parallel inside a single block. On a 12-second chain that demo is a
-40-minute wait; here it is the whole pitch.
+Farm economics play out over a decade, which makes them very hard to demo. Monad's 400ms
+blocks let us replay that decade live. The Time Machine fires off hundreds of real
+transactions (harvests, revenue distributions, the investor share dropping 70, 65, 60,
+all the way to 0) while you watch the ladder tick down on screen. Revenue distribution to
+every investor in a parcel lands in parallel inside one block. On a 12-second chain that
+demo is a 40-minute wait. Here it's the whole pitch.
 
 ---
 
 ## How the money works
 
-Every rule below is enforced by the contract, not by the UI.
+Every rule below is enforced by the contract, not the UI.
 
 | Rule | Value |
 |---|---|
 | Token price | 1 LAND token = 1 mUSDC |
-| Initial investor revenue share | **70%** (`INITIAL_INVESTOR_SHARE` = 7000 bps) |
-| Share step-down | **−5 points per year** (`SHARE_DECREASE_PER_YEAR` = 500 bps) |
-| Buyback reserve | **10%** of every purchase is held back (`BUYBACK_RESERVE_PCT`) |
-| Exit cooldown | **90 days** between requesting a sale and executing it (`SELL_COOLDOWN`) |
-| Appreciation on exit | **+1% per year** held, minimum 1 year (`APPRECIATION_PCT_PER_YEAR` = 100 bps) |
-| Fixed-return option | Per parcel (`fixedReturnBps`) — caps your total return, excess goes to the farmer |
-| Crop cycle | Per parcel (`cropCycleYears`); replanting resets to fresh 70/30 terms |
-| Stay limits | ≤ 7 nights, ≤ 8 guests, one booking per parcel per day |
+| Initial investor revenue share | 70% (`INITIAL_INVESTOR_SHARE` = 7000 bps) |
+| Share step-down | 5 points per year (`SHARE_DECREASE_PER_YEAR` = 500 bps) |
+| Buyback reserve | 10% of every purchase is held back (`BUYBACK_RESERVE_PCT`) |
+| Exit cooldown | 90 days between requesting a sale and executing it (`SELL_COOLDOWN`) |
+| Appreciation on exit | 1% per year held, minimum 1 year (`APPRECIATION_PCT_PER_YEAR` = 100 bps) |
+| Fixed-return option | Set per parcel (`fixedReturnBps`), caps your total return and sends the excess to the farmer |
+| Crop cycle | Set per parcel (`cropCycleYears`), replanting resets to fresh 70/30 terms |
+| Stay limits | 7 nights max, 8 guests max, one booking per parcel per day |
 
-**The exit path, plainly:** you request a sale → your tokens lock in the contract →
-90 days pass → you execute → you get your principal back plus 1% per year of appreciation,
-paid out of the buyback reserve. You stop earning harvest revenue the moment you exit.
+The exit path works like this. You request a sale, your tokens lock in the contract, 90
+days pass, then you execute and get your principal back plus 1% per year of appreciation,
+paid out of the buyback reserve. Once you exit you stop earning harvest revenue. The app
+prints these terms everywhere they apply, because nobody should be finding out about a
+cooldown on the way out the door.
 
 ### The eight parcels
 
 | # | Crop | Acres | Tokens | Price/acre | First harvest | Cycle |
 |---|---|---|---|---|---|---|
-| 0 | Saffron | 1 | 40,000 | $40K | Oct–Nov, Y1 | Once a year |
-| 1 | Cordyceps | 1 | 40,000 | $40K | Month 2 | 4–6 crops/yr |
-| 2 | Mushroom | 1 | 25,000 | $25K | Month 1 | 5–6 crops/yr |
-| 3 | Dragon Fruit | 2 | 30,000 | $15K | Year 2 | 2–3 flushes/yr |
+| 0 | Saffron | 1 | 40,000 | $40K | Oct/Nov, Y1 | Once a year |
+| 1 | Cordyceps | 1 | 40,000 | $40K | Month 2 | 4 to 6 crops/yr |
+| 2 | Mushroom | 1 | 25,000 | $25K | Month 1 | 5 to 6 crops/yr |
+| 3 | Dragon Fruit | 2 | 30,000 | $15K | Year 2 | 2 to 3 flushes/yr |
 | 4 | Pomegranate | 5 | 60,000 | $12K | Year 3 | Annual |
 | 5 | Grapes | 5 | 100,000 | $20K | Year 3 | Annual |
 | 6 | Turmeric | 5 | 40,000 | $8K | Month 9 | 1 crop/yr |
 | 7 | Ginger | 5 | 50,000 | $10K | Month 9 | 1 crop/yr |
 
-Anyone can also deploy their own parcel through the factory.
+You can also deploy your own parcel through the factory.
 
 ---
 
-## Run the frontend
+## Run it in 3 minutes
 
-**You need:** [Node.js 20 or newer](https://nodejs.org) and [git](https://git-scm.com).
-No database, no Docker, no API keys.
+You need [Node.js 20 or newer](https://nodejs.org) and [git](https://git-scm.com).
+Nothing else. No database, no Docker, no API keys.
+
+**1. Get the code**
 
 ```bash
-git clone https://github.com/maheepatel/Farmora.git
-cd Farmora/frontend
+git clone https://github.com/<your-username>/farmora.git
+```
+
+**2. Go into the frontend**
+
+```bash
+cd farmora/frontend
+```
+
+**3. Install**
+
+```bash
 npm install
+```
+
+**4. Start it**
+
+```bash
 npm run dev
 ```
 
 Open **http://localhost:3000**. The app runs and you can browse every page without a
-wallet or account.
+wallet, without an account, and without deploying anything.
 
-> **Note:** the frontend currently runs with a simulated wallet, purchases and yield in
-> the browser until the real wagmi/viem + RainbowKit wiring lands. The contract ABIs are
-> already in `frontend/src/lib/abi/` and live addresses in `contracts/deployed.json`.
+One thing worth knowing about `npm run dev`: it runs `sync:contracts` first, which copies
+contract addresses from `contracts/deployed.json` into the frontend. You never need to
+call that script yourself.
 
----
-
-## Run the contracts
-
-```bash
-cd Farmora/contracts
-npm install
-npm run compile      # Solc 0.8.27
-npm test             # 44 unit tests
-```
+If the parcels all say **"Not deployed"**, the contracts aren't on the testnet yet. See
+[Deployed contracts](#deployed-contracts) below. Browsing still works either way.
 
 ---
 
 ## Set up your wallet
 
-Only needed once real on-chain transactions are enabled. Browsing needs none of this.
+You only need this if you want to buy, claim, sell or book. Browsing needs none of it.
 
-**1. Install a wallet** — [MetaMask](https://metamask.io) or [Rabby](https://rabby.io).
+**1. Install a wallet.** [MetaMask](https://metamask.io) or [Rabby](https://rabby.io).
 
-**2. Add Monad Testnet.** Easiest way is [faucet.monad.xyz/add-network](https://faucet.monad.xyz/add-network),
-which adds it in one click. To do it by hand:
+**2. Add Monad Testnet.** The quickest way is
+[faucet.monad.xyz/add-network](https://faucet.monad.xyz/add-network), which does it in one
+click. By hand:
 
 | Field | Value |
 |---|---|
@@ -142,76 +160,183 @@ which adds it in one click. To do it by hand:
 | Currency symbol | `MON` |
 | Block explorer | `https://testnet.monadscan.com` |
 
-**3. Get testnet MON for gas** — [faucet.monad.xyz](https://faucet.monad.xyz). Free,
-takes a few seconds, no real money involved anywhere in this project.
+**3. Get testnet MON for gas** from [faucet.monad.xyz](https://faucet.monad.xyz). It's
+free and takes a few seconds. No real money is involved anywhere in this project.
 
-**4. Get mUSDC to invest with** — the `MockUSDC` contract mints **50,000 mUSDC**, once
-per address.
+**4. Get mUSDC to invest with.** Connect your wallet in the app and hit the faucet button.
+You get 50,000 mUSDC, once per address, straight from the contract.
+
+**5. See your tokens in your wallet.** Go to `/add-tokens` and tap once per token to add
+it to MetaMask. Optional, but it makes the whole thing feel a lot more real.
+
+---
+
+## Take the tour
+
+Fastest path through everything the product does:
+
+1. **`/`** Landing page. Live ledger panel showing the current investor/farmer split
+   across all parcels, refreshed every 30 seconds from the chain.
+2. **`/marketplace`** All eight parcels with valuations and the share-slide row. Pick one.
+3. **`/batch/[id]`** Choose fixed-return or variable, buy tokens with mUSDC, get confetti.
+   Tabs here for the farm's proof-of-work clips and its farmhouse.
+4. **`/admin`** Farm Ops. Advance time, push the crop through its growth stages, trigger a
+   harvest, enter revenue and let the contract split it. Create and claim milestones,
+   upload a clip, deploy a whole new parcel.
+5. **`/portfolio`** Your holdings and pending revenue. Claim it. Request a sale and watch
+   the 90-day cooldown count down.
+6. **`/stays`** Book a weekend at the farmhouse on a parcel you own. Try double-booking a
+   night and the chain will stop you.
+7. **`/add-tokens`** One-tap add of mUSDC and every LAND token to your wallet.
+
+If you're demoing this to someone, run through `/admin` first. An app with no harvests, no
+clips and no bookings in it looks half-finished however good the code underneath is.
 
 ---
 
 ## Project layout
 
 ```
-Farmora/
-├── contracts/                     Solidity contracts, deploy scripts, tests
-│   ├── contracts/                 LandBatch, LandBatchFactory, MockUSDC, StayBooking
-│   ├── test/                      44 unit tests
-│   ├── scripts/                   deploy.ts, deploy-stays.ts
-│   └── deployed.json              ← THE source of truth for contract addresses
+farmora/
+├── contracts/
+│   └── deployed.json          the source of truth for contract addresses
 ├── frontend/
+│   ├── contracts/
+│   │   └── deployed.json      auto-copied from above, don't edit this one
+│   ├── scripts/
+│   │   └── sync-contracts.mjs the copier, runs on predev and prebuild
 │   ├── src/
-│   │   ├── app/                   ← Next.js App Router
-│   │   │   ├── page.tsx               landing
-│   │   │   ├── parcels/               marketplace
-│   │   │   ├── parcels/[id]/          parcel detail + buy + yield simulator
-│   │   │   └── dashboard/             portfolio, claim yield
-│   │   ├── components/            ← UI
+│   │   ├── app/               Next.js App Router, one folder per page
+│   │   │   ├── page.tsx           landing
+│   │   │   ├── marketplace/       parcel list
+│   │   │   ├── batch/[id]/        parcel detail and buy
+│   │   │   ├── portfolio/         holdings, claim, sell
+│   │   │   ├── admin/             farm ops
+│   │   │   ├── stays/             farmhouse bookings
+│   │   │   └── add-tokens/        wallet token registry
+│   │   ├── components/        UI
 │   │   └── lib/
-│   │       ├── abi/               ← contract ABIs (4 JSON files)
-│   │       ├── parcels.ts         ← the 8 parcels
-│   │       ├── store.ts           ← wallet + portfolio (simulated until wagmi lands)
-│   │       └── format.ts          ← number/date formatting
-│   ├── tests/e2e.mjs              ← E2E harness (reads contracts/deployed.json)
+│   │       ├── abi/           contract ABIs, 4 JSON files
+│   │       ├── config.ts      chain config, economics, the 8 parcels
+│   │       ├── wagmi.ts       wallet connection
+│   │       ├── live.ts        the 30s live-read layer
+│   │       ├── tx.ts          transaction helpers
+│   │       └── format.ts      number and date formatting
 │   └── package.json
-└── README.md                      ← you are here
+├── PRD.md                     full product spec
+└── README.md                  you are here
 ```
+
+The one file worth reading first is
+[`frontend/src/lib/config.ts`](frontend/src/lib/config.ts). Chain settings, all eight
+parcels and every economic constant live in there.
 
 ### The contracts
 
 | Contract | What it does |
 |---|---|
 | `MockUSDC` | Test stablecoin, 18 decimals, 50,000 one-time faucet per address |
-| `LandBatch` | One per parcel. The whole economy: buy, sell + cooldown, revenue split and claim, milestones, clips, growth stages, year advance, replanting |
-| `LandBatchFactory` | Deploys and registers new parcels (admin-only) |
-| `StayBooking` | Farmhouse nights: book, cancel, refund, per-day slot locking, paid in mUSDC |
+| `LandBatch` | One per parcel, and it holds the whole economy: buy, sell with cooldown, revenue split and claim, milestones, clips, growth stages, year advance, replanting |
+| `LandBatchFactory` | Deploys and registers new parcels |
+| `StayBooking` | Farmhouse nights: book, cancel, refund, per-day slot locking |
 
 ---
 
 ## Deployed contracts
 
-**Monad Testnet · chain ID 10143 (`0x279f`) · [testnet.monadscan.com](https://testnet.monadscan.com)**
+Monad Testnet, chain ID 10143. Explorer at
+[testnet.monadscan.com](https://testnet.monadscan.com).
 
-| Contract | CA (Contract Address) | Monadscan |
+| Contract | Address |
+|---|---|
+| MockUSDC | `0x...` |
+| LandBatchFactory | `0x...` |
+| StayBooking | `0x...` |
+
+<details>
+<summary>Parcel addresses</summary>
+
+| # | Crop | Address |
 |---|---|---|
-| MockUSDC | `0xa3849C2644cF2D478c8ABc4D4801A78a1F130dB0` | [view](https://testnet.monadscan.com/address/0xa3849C2644cF2D478c8ABc4D4801A78a1F130dB0) |
-| LandBatchFactory | `0x9FC7143b8fD592464Ebc0a2cc114a533A9fAC3A6` | [view](https://testnet.monadscan.com/address/0x9FC7143b8fD592464Ebc0a2cc114a533A9fAC3A6) |
-| StayBooking | `0xE6BfDaf80E3934f4c68558Ddc7104811fAe2049e` | [view](https://testnet.monadscan.com/address/0xE6BfDaf80E3934f4c68558Ddc7104811fAe2049e) |
-| Batch 0 · Saffron | `0x5BeD428Eb28E13CbfF1e71C33F1e58dA7ca75DF3` | [view](https://testnet.monadscan.com/address/0x5BeD428Eb28E13CbfF1e71C33F1e58dA7ca75DF3) |
-| Batch 1 · Cordyceps | `0x10e1B5d9e90e32B925aB463d39De120d0a4309A9` | [view](https://testnet.monadscan.com/address/0x10e1B5d9e90e32B925aB463d39De120d0a4309A9) |
-| Batch 2 · Mushroom | `0x7809ba0628858c3F2fcB7a697808ca47E1748FCA` | [view](https://testnet.monadscan.com/address/0x7809ba0628858c3F2fcB7a697808ca47E1748FCA) |
-| Batch 3 · Dragon Fruit | `0x4BA574bC1a94e1D3Bd4d462C5FF09848a6Cf08F9` | [view](https://testnet.monadscan.com/address/0x4BA574bC1a94e1D3Bd4d462C5FF09848a6Cf08F9) |
-| Batch 4 · Pomegranate | `0x6303ba82426C299D0a6AC03558629707A7C6CE1e` | [view](https://testnet.monadscan.com/address/0x6303ba82426C299D0a6AC03558629707A7C6CE1e) |
-| Batch 5 · Grapes | `0x6466D2D94D00c809aA325Bf3920336C1133FDEff` | [view](https://testnet.monadscan.com/address/0x6466D2D94D00c809aA325Bf3920336C1133FDEff) |
-| Batch 6 · Turmeric | `0x97acc0E247A646096e1bD7C7030642b656b46297` | [view](https://testnet.monadscan.com/address/0x97acc0E247A646096e1bD7C7030642b656b46297) |
-| Batch 7 · Ginger | `0x47e6560cEf1Aecf8765373E0f878D82AF7bdB364` | [view](https://testnet.monadscan.com/address/0x47e6560cEf1Aecf8765373E0f878D82AF7bdB364) |
+| 0 | Saffron | `0x...` |
+| 1 | Cordyceps | `0x...` |
+| 2 | Mushroom | `0x...` |
+| 3 | Dragon Fruit | `0x...` |
+| 4 | Pomegranate | `0x...` |
+| 5 | Grapes | `0x...` |
+| 6 | Turmeric | `0x...` |
+| 7 | Ginger | `0x...` |
 
-All verified live with `eth_getCode` and visible on [testnet.monadscan.com](https://testnet.monadscan.com),
-and source-verified on MonadVision (Sourcify) at `https://testnet.monadvision.com/contracts/full_match/10143/<address>`.
+</details>
 
-`contracts/deployed.json` is the machine-readable handoff file consumed by the frontend
-and the E2E harness. Set `PRIVATE_KEY=0x...` in `contracts/.env` (never committed) and
-run `npm run deploy` / `npm run deploy:stays` to redeploy.
+### How addresses get into the app
+
+Edit `contracts/deployed.json` at the repo root. That one file, nothing else:
+
+```json
+{
+  "chainId": 10143,
+  "chainName": "Monad Testnet",
+  "mockUSDC": "0x...",
+  "factory": "0x...",
+  "stayBooking": "0x...",
+  "batches": ["0x...", "0x...", "0x...", "0x...", "0x...", "0x...", "0x...", "0x..."],
+  "stayPrices": [250, 300, 150, 400, 500, 450, 200, 200]
+}
+```
+
+`npm run dev` and `npm run build` copy it into the frontend for you. Any address still set
+to `0x0000000000000000000000000000000000000000` renders that parcel as "Not deployed"
+rather than crashing, so a partial deployment won't take the app down.
+
+---
+
+## Configuration
+
+There's one environment variable and it's optional.
+
+Create `frontend/.env.local`:
+
+```
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
+```
+
+| Variable | Required? | What it does |
+|---|---|---|
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | No | Turns on WalletConnect for mobile wallets and QR scanning. Free at [cloud.reown.com](https://cloud.reown.com). Browser wallets like MetaMask work fine without it. |
+
+You don't need any private keys, API keys or secrets to run the app.
+
+### RPC endpoints
+
+Four Monad testnet RPCs are configured with automatic failover so one provider going down
+doesn't take the app with it:
+
+`testnet-rpc.monad.xyz`, then `rpc-testnet.monadinfra.com`, then
+`rpc.ankr.com/monad_testnet`, then `10143.rpc.thirdweb.com`.
+
+The list lives in [`frontend/src/lib/config.ts`](frontend/src/lib/config.ts).
+
+---
+
+## All commands
+
+Run these from `frontend/`:
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Dev server on port 3000, syncs addresses first |
+| `npm run build` | Production build, syncs addresses first |
+| `npm start` | Serve the production build |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run sync:contracts` | Copy addresses from root into the frontend, runs automatically |
+
+Before pushing, both of these should come back clean:
+
+```bash
+npm run typecheck && npm run lint && npm run build
+```
 
 ---
 
@@ -220,43 +345,87 @@ run `npm run deploy` / `npm run deploy:stays` to redeploy.
 ### The contracts
 
 Deploy `MockUSDC`, `LandBatchFactory`, `StayBooking` and the eight `LandBatch` parcels to
-Monad Testnet, then the addresses land in `contracts/deployed.json`. Monad is fully
-EVM-equivalent, so Hardhat works unchanged:
+Monad Testnet, paste the addresses into `contracts/deployed.json`, restart the dev server.
+Monad is fully EVM-equivalent so Hardhat and Foundry work unchanged. The network config is
+just:
 
 ```
 url: "https://testnet-rpc.monad.xyz"   chainId: 10143
 ```
 
 Fund the deployer wallet from [faucet.monad.xyz](https://faucet.monad.xyz) first. Keep the
-deployer key in `contracts/.env` and **never commit it** — `.env*` is already gitignored.
+deployer key in `contracts/.env` and don't commit it. `.env*` is already gitignored.
 
 ### The frontend
 
-Deploy to [Vercel](https://vercel.com/new): import the repo, set **Root Directory** to
-`frontend`, deploy. Nothing else to configure.
+Deploy on [Vercel](https://vercel.com/new). Import the repo, set Root Directory to
+`frontend`, add `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` if you have one, deploy. There's
+nothing else to configure.
+
+---
+
+## Troubleshooting
+
+**Everything says "Not deployed."**
+The contracts aren't on-chain yet, or `contracts/deployed.json` still has zero addresses in
+it. Fill it in and restart the dev server.
+
+**Wallet won't connect.**
+Check you're on Monad Testnet (chain 10143) and not Ethereum. The app only supports 10143,
+which is deliberate so you can't sign against the wrong chain by accident.
+
+**"Insufficient funds" when buying.**
+There are two tokens in play. MON pays for gas and comes from
+[faucet.monad.xyz](https://faucet.monad.xyz). mUSDC buys land and comes from the in-app
+faucet. You need both.
+
+**Transactions hang or reads fail.**
+Usually a testnet RPC having a bad minute. Reload and failover picks another provider. If
+it keeps happening, reorder `RPC_URLS` in `config.ts`.
+
+**Faucet says already claimed.**
+It's once per address and enforced on-chain. Use a different wallet.
+
+**Addresses changed but the app shows the old ones.**
+Restart `npm run dev`. The sync only runs at startup.
+
+**`npm install` fails.**
+Check `node --version` is 20 or higher, then delete `node_modules` and `package-lock.json`
+and try again.
 
 ---
 
 ## Project status
 
-Built for **[Monad Blitz Bangalore V5](https://blitz.devnads.com/events/monad-blitz-bangalore-v5)**.
+Built for [Monad Blitz Bangalore V5](https://blitz.devnads.com/events/monad-blitz-bangalore-v5).
 
 **Working**
-- Smart contracts: compile clean (Solc 0.8.27), **44/44 unit tests passing**, deployed +
-  verified on Monad Testnet (chain 10143)
-- Full frontend: landing, marketplace, parcel detail + buy + yield simulator, dashboard;
-  responsive, editorial-light-luxury design system
-- Contract ABIs in `frontend/src/lib/abi/`, E2E harness in `frontend/tests/`
+
+- Full frontend: all seven pages, live-read layer, celebrations, responsive, respects
+  reduced-motion
+- Monad Testnet wired end to end with four-provider RPC failover
+- Contract ABIs and the typed integration layer around them
+- Graceful "not deployed" states so a missing address never blanks the app
 
 **In progress**
-- Real wallet wiring: replace the simulated `frontend/src/lib/store.ts` with wagmi/viem +
-  RainbowKit calls against the deployed contracts
+
+- Solidity sources go in `contracts/`, deployment to Monad Testnet still pending
+- The Time Machine, replaying a decade of farm economics as live transactions
 
 **Not built yet**
-- The Time Machine (replaying a decade of farm economics as live transactions)
-- Real IPFS pinning for clips (currently takes a URL)
-- Legal title / land registry layer — this is a testnet demo with a mock stablecoin,
-  not a securities offering
+
+- Automated contract tests and an end to end suite
+- Real IPFS pinning for clips, currently it takes a URL
+- Legal title and land registry. This is a testnet demo with a mock stablecoin, not a
+  securities offering.
+
+**Known limitations**
+
+- One wallet acts as both farmer and admin on the seed parcels. That's fine for a demo but
+  role separation is a hard requirement before mainnet.
+- The buyback reserve is 10% of purchases. Enough for normal exits, not for a bank run.
+- Return estimates on parcel pages are illustrative. Real revenue is whatever the farmer
+  actually distributes on-chain.
 
 ---
 
@@ -264,10 +433,10 @@ Built for **[Monad Blitz Bangalore V5](https://blitz.devnads.com/events/monad-bl
 
 | | |
 |---|---|
-| **Person A** | Smart contracts (deployed + verified on Monad Testnet) |
-| **Person B** | Frontend |
+| **[Your name]** | Smart contracts |
+| **[Teammate's name]** | Frontend |
 
-Built at Monad Blitz Bangalore V5.
+Built at Monad Blitz Bangalore V5. Full product spec is in [`PRD.md`](PRD.md).
 
 ## License
 
