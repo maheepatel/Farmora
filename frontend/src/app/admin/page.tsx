@@ -119,7 +119,7 @@ function BatchSummary({ id }: { id: number }) {
   return (
     <div className="sketch-soft bg-paper-2 p-4 text-sm">
       <p className="font-display text-lg text-ink">{getBatchMeta(id).cropType}</p>
-      <p className="mt-1 text-ink-2">Tokens Sold: <span className="font-display text-ink">{fmtWhole(d.soldTokens)}</span></p>
+      <p className="mt-1 text-ink-2">Tokens Sold: <span className="font-display text-ink">{fmtTokens(d.soldTokens)}</span></p>
       <p className="text-ink-2">Revenue (mUSDC) distributed: <span className="font-display text-ink">{fmtUSDC(d.totalRevenueDistributed)}</span></p>
       <p className="text-ink-2">Buyback reserve: <span className="font-display text-ink">{fmtUSDC(d.buybackReserve)}</span></p>
     </div>

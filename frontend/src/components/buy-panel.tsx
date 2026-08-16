@@ -3,6 +3,7 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { waitForTransactionReceipt } from "@wagmi/core/actions";
 import { AnimatePresence, animate, motion } from "framer-motion";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { landBatchAbi, usdcAbi, useUSDCBalance } from "@/lib/contracts";
@@ -54,6 +55,7 @@ export function BuyPanel({
   );
   const price = pricePerToken || 1000000000000000000n;
   const needsApproval = ((allowance as bigint) ?? 0n) < cost;
+  const needFunds = isConnected && cost > 0n && usdcBalance < cost;
 
   const approve = useWriteContract();
   const buy = useWriteContract();
@@ -135,8 +137,8 @@ export function BuyPanel({
             onClick={() => setIsFixed(true)}
             className={`rounded-full border-2 px-2 py-1.5 text-sm font-semibold transition-all ${
               isFixed
-                ? "border-ink bg-ink text-paper shadow-[2px_2px_0_rgba(43,38,29,0.2)]"
-                : "border-transparent text-ink-2 hover:bg-white"
+                ? "border-sage-2 bg-sage-2 text-paper shadow-[2px_2px_0_rgba(95,125,78,0.35)]"
+                : "border-transparent bg-white/70 text-ink-2 hover:bg-white"
             }`}
           >
             Fixed return
@@ -146,8 +148,8 @@ export function BuyPanel({
             onClick={() => setIsFixed(false)}
             className={`rounded-full border-2 px-2 py-1.5 text-sm font-semibold transition-all ${
               !isFixed
-                ? "border-ink bg-ink text-paper shadow-[2px_2px_0_rgba(43,38,29,0.2)]"
-                : "border-transparent text-ink-2 hover:bg-white"
+                ? "border-sage-2 bg-sage-2 text-paper shadow-[2px_2px_0_rgba(95,125,78,0.35)]"
+                : "border-transparent bg-white/70 text-ink-2 hover:bg-white"
             }`}
           >
             Variable return
@@ -199,6 +201,18 @@ export function BuyPanel({
               </button>
             )}
           </ConnectButton.Custom>
+        ) : needFunds ? (
+          <motion.div key="funds" className="flex flex-col gap-2">
+            <div className="sketch-soft bg-harvest/15 p-3 text-center">
+              <p className="font-display text-lg text-ink">You have no mUSDC yet</p>
+              <p className="mt-1 text-xs text-ink-2">
+                Claim free test tokens to start buying.
+              </p>
+            </div>
+            <Link href="/add-tokens" className="btn btn-sun w-full">
+              Claim tokens
+            </Link>
+          </motion.div>
         ) : (
           <motion.div key="actions" className="flex flex-col gap-2">
             {step === "error" && (

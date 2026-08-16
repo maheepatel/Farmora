@@ -6,7 +6,7 @@ import { useState } from "react";
 import { BuyPanel } from "@/components/buy-panel";
 import { getBatchMeta } from "@/lib/config";
 import { batchAddress, useBatch, useStayPrice } from "@/lib/contracts";
-import { fmtUSDC, fmtWhole, pct, GROWTH_STAGES, timeAgo } from "@/lib/format";
+import { fmtTokens, fmtUSDC, fmtWhole, pct, GROWTH_STAGES, timeAgo } from "@/lib/format";
 import { estimateReturns } from "@/lib/estimator";
 import { cropVideo } from "@/lib/images";
 
@@ -131,8 +131,8 @@ export function BatchDetail({ id }: { id: number }) {
               <div className="sketch-xs bg-white p-4">
                 <p className="text-xs font-semibold text-ink-3">tokens sold / available</p>
                 <p className="font-display text-4xl text-ink">
-                  {live ? fmtWhole(d.soldTokens) : "…"}
-                  <span className="text-xl font-medium text-ink-3"> / {live ? fmtWhole(d.availableTokens) : "…"}</span>
+                  {live ? fmtTokens(d.soldTokens) : "…"}
+                  <span className="text-xl font-medium text-ink-3"> / {live ? fmtTokens(d.availableTokens) : "…"}</span>
                 </p>
               </div>
               <div className="sketch-xs bg-white p-4">
